@@ -36,12 +36,18 @@
 
   <!-- PESTAÑA CHAT -->
   <div class="pestana activa" id="chat">
-    <div class="panel-card">
+    <div class="ventana-chat">
+      <div class="cabecera-chat">
+        <div class="avatar">🍔</div>
+        <div class="datos">
+          <div class="nombre">Market Burger</div>
+          <div class="estado-sitio"><span class="punto-en-linea"></span> En línea · responde al instante</div>
+        </div>
+      </div>
       <div class="chat" id="chat"></div>
-      <div class="acciones-rapidas" id="acciones-rapidas"></div>
       <div class="campo-chat">
         <input type="text" id="entrada" placeholder="Escribe tu mensaje, ej: ¿qué venden?" autocomplete="off">
-        <button class="boton" onclick="enviarMensaje()">Enviar</button>
+        <button class="boton accion" onclick="enviarMensaje()" title="Enviar">➤</button>
       </div>
     </div>
   </div>
@@ -104,6 +110,7 @@
 let etapaCaptura = null;
 let prospectoParcial = {};
 let intencionActual = "";
+let ultimoTextoCliente = "";
 
 /* ============ ALMACENAMIENTO (usa la base del CLIENTE) ============ */
 function leerProspectosLocal() {
@@ -115,17 +122,46 @@ function buscarPorId(lista, id) {
 }
 
 /* ============ CHAT ============ */
-function agregarMensaje(tipo, texto, conChips) {
+function horaActual() {
+  return new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+}
+
+function agregarMensaje(tipo, texto, conChips, conEscribiendo) {
   const chat = document.getElementById("chat");
   const div = document.createElement("div");
   div.className = "msg " + tipo;
+
+  if (tipo === "ia" || tipo === "sistema") {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar-msg";
+    avatar.textContent = "🍔";
+    div.appendChild(avatar);
+  }
+
+  const col = document.createElement("div");
+  col.style.maxWidth = "100%";
+
   const burbuja = document.createElement("div");
   burbuja.className = "burbuja";
   burbuja.innerHTML = escapar(texto)
     .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
     .replace(/\n/g, "<br>");
-  div.appendChild(burbuja);
+  col.appendChild(burbuja);
+
+  const hora = document.createElement("span");
+  hora.className = "hora";
+  hora.textContent = horaActual();
+  col.appendChild(hora);
+
+  div.appendChild(col);
   chat.appendChild(div);
+
+  if (tipo === "cliente") {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar-msg";
+    avatar.textContent = "👤";
+    div.appendChild(avatar);
+  }
 
   if (conChips && Array.isArray(conChips) && conChips.length) {
     const chips = document.createElement("div");
@@ -137,8 +173,30 @@ function agregarMensaje(tipo, texto, conChips) {
       b.onclick = () => { agregarMensaje("cliente", op); procesarConsulta(op); };
       chips.appendChild(b);
     });
-    div.appendChild(chips);
+    col.appendChild(chips);
   }
+
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+function mostrarEscribiendo() {
+  const chat = document.getElementById("chat");
+  const div = document.createElement("div");
+  div.className = "msg ia escribiendo-msg";
+  const avatar = document.createElement("div");
+  avatar.className = "avatar-msg";
+  avatar.textContent = "🍔";
+  div.appendChild(avatar);
+  const burbuja = document.createElement("div");
+  burbuja.className = "burbuja escribiendo";
+  for (let i = 0; i < 3; i++) {
+    const punto = document.createElement("span");
+    punto.className = "punto";
+    burbuja.appendChild(punto);
+  }
+  div.appendChild(burbuja);
+  chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
 }
@@ -150,6 +208,34 @@ function escapar(t) {
 }
 
 function procesarConsulta(texto) {
+  ultimoTextoCliente = texto;
+  responderConEspera();
+}
+
+function responderConEspera() {
+  const espera = mostrarEscribiendo();
+  const retraso = 700 + Math.random() * 500;
+  setTimeout(() => {
+    espera.remove();
+    procesarRespuestaInterna();
+  }, retraso);
+}
+
+function respuestaIA(texto, chips) {
+  responderConEsperaCon(texto, chips);
+}
+
+function responderConEsperaCon(iaTexto, chips) {
+  const espera = mostrarEscribiendo();
+  setTimeout(() => {
+    espera.remove();
+    agregarMensaje("ia", iaTexto, chips);
+  }, 600 + Math.random() * 400);
+}
+
+function procesarRespuestaInterna() {
+  const texto = ultimoTextoCliente || "";
+
   // Si estamos capturando datos, el flujo es estricto
   if (etapaCaptura) {
     manejarCaptura(texto);
@@ -186,23 +272,23 @@ function sugerencias(intencion) {
 function manejarCaptura(texto) {
   if (etapaCaptura === "nombre") {
     if (texto.trim().length < 2) {
-      agregarMensaje("ia", "Disculpa, ¿cuál es tu nombre? 😊");
+      respuestaIA("Disculpa, ¿cuál es tu nombre? 😊");
       return;
     }
     prospectoParcial.nombre = texto.trim();
     etapaCaptura = "telefono";
-    agregarMensaje("ia", "¡Gracias " + prospectoParcial.nombre + "! 📱 Ahora me compartes tu **NÚMERO DE CELULAR** para contactarte.");
+    respuestaIA("¡Gracias " + prospectoParcial.nombre + "! 📱 Ahora me compartes tu **NÚMERO DE CELULAR** para contactarte.");
     return;
   }
   if (etapaCaptura === "telefono") {
     const num = extraerNumero(texto);
     if (!num) {
-      agregarMensaje("ia", "Ese número no parece valido 😅. Solo necesito tus dígitos para contactarte. ¿Me lo repites?");
+      respuestaIA("Ese número no parece valido 😅. Solo necesito tus dígitos para contactarte. ¿Me lo repites?");
       return;
     }
     prospectoParcial.telefono = num;
     etapaCaptura = "interes";
-    agregarMensaje("ia", "¡Genial! 🎉 Y para terminar: ¿qué es lo que más te interesa de " + MarketAttack.CLIENTE.nombreComercial + "? (ej: la promo del viernes, un combo, el domicilio...)");
+    respuestaIA("¡Genial! 🎉 Y para terminar: ¿qué es lo que más te interesa de " + MarketAttack.CLIENTE.nombreComercial + "? (ej: la promo del viernes, un combo, el domicilio...)");
     return;
   }
   if (etapaCaptura === "interes") {
@@ -225,7 +311,7 @@ function guardarProspectoLocal() {
   const nombre = prospectoParcial.nombre;
   etapaCaptura = null;
   prospectoParcial = {};
-  agregarMensaje("ia", "✅ ¡Listo " + nombre + "! Tu información quedó registrada y el restaurante ya recibió tu oportunidad. En breve te contactamos por WhatsApp. ¡Gracias por preferir " + MarketAttack.CLIENTE.nombreComercial + "! 🍔");
+  respuestaIA("✅ ¡Listo " + nombre + "! Tu información quedó registrada y el restaurante ya recibió tu oportunidad. En breve te contactamos por WhatsApp. ¡Gracias por preferir " + MarketAttack.CLIENTE.nombreComercial + "! 🍔");
   actualizarPanel();
   actualizarDashboard();
 }
@@ -236,7 +322,7 @@ function enviarMensaje() {
   if (!texto) return;
   agregarMensaje("cliente", texto);
   input.value = "";
-  setTimeout(() => procesarConsulta(texto), 400);
+  procesarConsulta(texto);
 }
 
 /* ============ PANEL (mini-CRM) ============ */
