@@ -1,0 +1,26 @@
+# MARKETATTACK · Qué NO se sube a GitHub (privacidad y orden)
+# -------------------------------------------------------------
+
+# Copias de seguridad locales (no se versionan)
+copia_seguridad/
+
+# Archivos de entorno y secretos (NUNCA se comparten)
+.env
+*.env
+.env.*
+
+# Archivos generados / temporales
+*.log
+*.tmp
+*.swp
+.DS_Store
+
+# Datos locales de la demo (el navegador guarda prospectos, no archivos)
+# (sin regla extra: localStorage no crea archivos)
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
