@@ -106,7 +106,7 @@ function responderConIntencion(intencion, texto) {
     case "menu": return obtenerMenu();
     case "horario": return "📍 Nuestro horario:\n" + CLIENTE.info.horario + "\n\n¿Quieres que te cuente el menú o la promo del viernes?";
     case "ubicacion": return "📍 Estamos en: " + CLIENTE.info.ubicacion + "\n\n" + CLIENTE.info.contacto;
-    case "promocion": iniciarCaptura("Promoción del viernes: " + CLIENTE.promociones[0].texto); return "";
+    case "promocion": return iniciarCaptura("Promoción del viernes: " + CLIENTE.promociones[0].texto);
     case "pedido": return "¡Claro! 🛵 Hacemos pedidos y domicilios.\n\n" + obtenerMenu() + "\n\nCuéntame qué te gustaría pedir.";
     case "pago": return "💳 Aceptamos efectivo, tarjeta y por transferencia. Al confirmar tu pedido te indicamos todos los medios.";
     case "reparto": return preguntasRapidas("reparto");
@@ -116,8 +116,7 @@ function responderConIntencion(intencion, texto) {
     default: {
       // Si el cliente menciona algo que parece un interés/compra, invita a capturar
       if (/(promo|oferta|quiero|me interesa|cuánto|cuanto|comprar)/.test(texto.toLowerCase())) {
-        iniciarCaptura(texto.trim());
-        return "";
+        return iniciarCaptura(texto.trim());
       }
       return aleatorio(RESPONSES.default);
     }

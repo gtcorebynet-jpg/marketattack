@@ -44,7 +44,7 @@
           <div class="estado-sitio"><span class="punto-en-linea"></span> En línea · responde al instante</div>
         </div>
       </div>
-      <div class="chat" id="chat"></div>
+      <div class="chat" id="chat-canvas"></div>
       <div class="campo-chat">
         <input type="text" id="entrada" placeholder="Escribe tu mensaje, ej: ¿qué venden?" autocomplete="off">
         <button class="boton accion" onclick="enviarMensaje()" title="Enviar">➤</button>
@@ -127,7 +127,7 @@ function horaActual() {
 }
 
 function agregarMensaje(tipo, texto, conChips, conEscribiendo) {
-  const chat = document.getElementById("chat");
+  const chat = document.getElementById("chat-canvas");
   const div = document.createElement("div");
   div.className = "msg " + tipo;
 
@@ -181,7 +181,7 @@ function agregarMensaje(tipo, texto, conChips, conEscribiendo) {
 }
 
 function mostrarEscribiendo() {
-  const chat = document.getElementById("chat");
+  const chat = document.getElementById("chat-canvas");
   const div = document.createElement("div");
   div.className = "msg ia escribiendo-msg";
   const avatar = document.createElement("div");
@@ -245,10 +245,6 @@ function procesarRespuestaInterna() {
   const intencion = detectarIntencion(texto);
   intencionActual = intencion;
   const respuesta = responderConIntencion(intencion, texto);
-  if (intencion === "promocion" || (respuesta === "" && intencion === "desconocido")) {
-    // La captura ya se inició dentro de responderConIntencion
-    if (etapaCaptura) return;
-  }
   if (respuesta) {
     agregarMensaje("ia", respuesta, sugerencias(intencion));
   }
