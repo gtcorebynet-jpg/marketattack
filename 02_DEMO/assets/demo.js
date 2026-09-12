@@ -91,9 +91,9 @@ function detectarIntencion(texto) {
   if (/(horario|horarios|abren|cierran|abierto|cuándo abren)/.test(t)) return "horario";
   if (/(ubicación|ubicacion|dirección|direccion|dónde|donde|cuál es la ubicación|mapa)/.test(t)) return "ubicacion";
   if (/(promo|promoción|promocion|oferta|descuento|especial|combo.*promo|viernes)/.test(t)) return "promocion";
-  if (/(pedir|pedido|domicilio|envio|envío|comprar|reservar|reserva|cotizar)/.test(t)) return "pedido";
+  if (/(reparto|cuánto demora|cuanto demora|demora|llega|tiempo d)/.test(t)) return "reparto";
   if (/(pago|pagar|tarjeta|efectivo|transferencia)/.test(t)) return "pago";
-  if (/(reparto|cuánto demora|demora|llega|tiempo d)/.test(t)) return "reparto";
+  if (/(pedir|pedido|domicilio|envio|envío|comprar|reservar|reserva|cotizar)/.test(t)) return "pedido";
   if (/(vegetariano|veggie|opciones sin carne|sin carne)/.test(t)) return "vegetariano";
   if (/(gracias|muchas gracias|perfecto|ok|de acuerdo|genial|excelente)/.test(t)) return "gracias";
   if (/(adiós|adios|chao|hasta luego|nos vemos|gracias.*adios)/.test(t)) return "despedida";

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Suites — MarketAttack</title>
+</head>
+<body>
+<pre id="out">corriendo…</pre>
+<script>
+/* ====================================================================
+   SUITE FUNCIONAL COMPLETA — MarketAttack tienda.html v2
+   ==================================================================== */
+const resultados = [];
+function registrar(nombre, condicion, detalle) {
+  resultados.push({ nombre, condicion: !!condicion, detalle: detalle || "" });
+}
+function esperar(ms) { return new Promise(r => setTimeout(r, ms)); }
+function fin() {
+  const fallos = resultados.filter(r => !r.condicion).length;
+  const lineas = resultados.map(r => (r.condicion ? "PASÓ" : "FALLÓ") + ": " + r.nombre + (r.detalle ? " — " + r.detalle : ""));
+  const texto = "TÍTULO: " + (resultados.length - fallos) + "/" + resultados.length + " pasaron\n" + lineas.join("\n");
+  document.getElementById("out").textContent = texto;
+  document.title = "RESULTADO " + (fallos ? "CON_FALLOS" : "OK");
+  try { new Image().src = "http://127.0.0.1:8899/r?d=" + encodeURIComponent(texto); } catch (e) {}
+}
+
+const t0 = Date.now();
+const iframe = document.createElement("iframe");
+iframe.src = "tienda.html?suite=2";
+iframe.style.width = "100%";
+iframe.style.height = "1000px";
+document.body.appendChild(iframe);
+
+iframe.onload = async function () {
+  try {
+    const win = iframe.contentWindow;
+    const doc = iframe.contentDocument;
+    win.confirm = () => true;
+    win.alert = () => {};
+
+    win.MarketAttack.limpiarProspectos();
+    await esperar(300);
+
+    /* ---------- TABS ---------- */
+    const tabsEl = doc.querySelectorAll(".tab");
+    registrar("T1. existen 4 pestañas", tabsEl.length === 4, "tabs=" + tabsEl.length);
+    for (const id of ["chat", "panel", "dashboard", "marketing", "chat"]) {
+      doc.querySelector('.tab[data-tab="' + id + '"]').click();
+      await esperar(150);
+      registrar("T2. clic activa '" + id + "'", doc.getElementById(id).classList.contains("activa"));
+    }
+
+    /* ---------- CHAT ---------- */
+    registrar("C1. bienvenida del bot visible", doc.querySelectorAll("#chat-canvas .msg.ia").length > 0);
+    registrar("C2. chips de sugerencia presentes", doc.querySelectorAll(".chip").length >= 4,
+      "chips=" + doc.querySelectorAll(".chip").length);
+
+    async function enviar(texto, espera) {
+      const entrada = doc.getElementById("entrada");
+      entrada.value = texto;
+      win.enviarMensaje();
+      await esperar(espera || 1400);
+    }
+
+    await enviar("¿qué venden?");
+    let canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("C3. responde con menú (Clásica)", canvas.includes("Clásica") && canvas.includes("18.000"));
+    registrar("C4. responde con promo del viernes", /PROMO DEL VIERNES|25\.000/i.test(canvas));
+
+    await enviar("¿horarios?"); canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("C5. responde horario", /Lunes a domingo/i.test(canvas));
+
+    await enviar("¿dónde están?"); canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("C6. responde ubicación", /Calle 33|Ciudad Verde|Soacha/i.test(canvas));
+
+    await enviar("¿cuánto demora el domicilio?"); canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("C7. responde reparto", /30 y 45 minutos/i.test(canvas));
+
+    await enviar("hola"); canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("C8. responde saludo", /hola|Hola|HOLA/i.test(canvas));
+
+    /* ---------- CAPTURA COMPLETA (Luis) ---------- */
+    await enviar("quiero la promo");
+    canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("P1. promo inicia captura pidiendo NOMBRE", /NOMBRE|nombre/i.test(canvas));
+    registrar("P1b. aún NO registra prospecto", win.MarketAttack.idsUnicos().length === 0);
+
+    await enviar("Luis Pérez", 2400); // doble retraso: espera + respuesta
+    canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("P2. tras nombre pide CELULAR", /CELULAR|celular/i.test(canvas));
+
+    await enviar("320 922 6563", 2400);
+    canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("P3. tras teléfono pregunta INTERÉS", /interesa|interés|interes/i.test(canvas));
+
+    await enviar("El combo familiar del viernes", 2400);
+    canvas = doc.getElementById("chat-canvas").textContent;
+    registrar("P4. confirma registro", /registrada|registró|contactamos/i.test(canvas));
+    await esperar(300);
+    registrar("P5. prospecto guardado", win.MarketAttack.idsUnicos().length === 1,
+      "n=" + win.MarketAttack.idsUnicos().length);
+    const p = win.MarketAttack.idsUnicos()[0];
+    registrar("P6. nombre/teléfono correctos", p && p.nombre === "Luis Pérez" && p.telefono === "3209226563");
+    registrar("P7. estado 'nuevo'", p && p.estado === "nuevo");
+
+    /* ---------- PANEL ---------- */
+    doc.querySelector('.tab[data-tab="panel"]').click();
+    await esperar(200);
+    registrar("PA1. panel muestra al prospecto", doc.getElementById("lista-prospectos").textContent.includes("Luis Pérez"));
+    const estadoSel = doc.querySelector(".estado");
+    registrar("PA2. selector de estado (nuevo)", !!estadoSel && estadoSel.className.includes("nuevo"));
+
+    estadoSel.value = "contactado";
+    estadoSel.dispatchEvent(new win.Event("change"));
+    await esperar(300);
+    registrar("PA3. cambio a 'contactado'", win.MarketAttack.idsUnicos()[0].estado === "contactado");
+
+    // filtros usando el texto del botón (evitar nth-child frágil)
+    function botonFiltro(txt) {
+      return [...doc.querySelectorAll("#filtros .boton")].find(b => b.textContent.trim() === txt);
+    }
+    botonFiltro("Nuevos").click();
+    await esperar(200);
+    registrar("PA4. filtro 'Nuevos' vacía la lista", doc.getElementById("lista-prospectos").textContent.includes("No hay prospectos"));
+    botonFiltro("Contactados").click();
+    await esperar(200);
+    registrar("PA5. filtro 'Contactados' lo muestra", doc.getElementById("lista-prospectos").textContent.includes("Luis Pérez"));
+    botonFiltro("Todos").click();
+    await esperar(200);
+
+    /* exportar CSV */
+    win.URL.createObjectURL = function (b) { win.__blob = b; return "blob:mock"; };
+    win.URL.revokeObjectURL = function () {};
+    win.exportarCSV();
+    await esperar(300);
+    let csv = null;
+    if (win.__blob) csv = await win.__blob.text();
+    registrar("PA6. exporta CSV con nombre y teléfono", !!csv && csv.includes("Nombre") && csv.includes("Luis Pérez") && csv.includes("3209226563"));
+
+    /* eliminar */
+    doc.querySelector(".lista-prospectos button").click();
+    await esperar(300);
+    registrar("PA7. eliminar prospecto", win.MarketAttack.idsUnicos().length === 0);
+
+    /* ---------- SEGUNDA CAPTURA (Maria) + dashboard ---------- */
+    doc.querySelector('.tab[data-tab="chat"]').click();
+    await esperar(150);
+    await enviar("quiero la promo", 2200);
+    await enviar("Maria Gomez", 2400);
+    await enviar("319 555 4433", 2400);
+    await enviar("La promo del viernes", 2400);
+    await esperar(300);
+    registrar("D0. segunda captura guarda 1 prospecto", win.MarketAttack.idsUnicos().length === 1);
+
+    doc.querySelector('.tab[data-tab="panel"]').click();
+    await esperar(200);
+    const sel2 = doc.querySelector(".estado");
+    sel2.value = "vendido";
+    sel2.dispatchEvent(new win.Event("change"));
+    await esperar(300);
+
+    doc.querySelector('.tab[data-tab="dashboard"]').click();
+    await esperar(250);
+    const metricas = doc.getElementById("metricas").textContent;
+    registrar("D1. dashboard muestra 'Prospectos totales'", metricas.includes("Prospectos tot"));
+    registrar("D2. revela 1 vendido", /1\s*Vendidos|Vendidos[\s\S]*?1/.test(metricas) || (metricas.includes("Vendidos") && /\b1\b/.test(metricas)));
+
+    /* ---------- MARKETING ---------- */
+    doc.querySelector('.tab[data-tab="marketing"]').click();
+    await esperar(150);
+    doc.getElementById("idea-input").value = "Hamburguesa + bebida por $25.000 este viernes";
+    win.generarMarketing();
+    await esperar(400);
+    const gen = doc.getElementById("resultados-gen");
+    registrar("M1. genera 4 bloques", gen.querySelectorAll(".gen-bloque textarea").length === 4,
+      "bloques=" + gen.querySelectorAll(".gen-bloque").length);
+    registrar("M2. canales correctos", /Instagram/.test(gen.textContent) && /Facebook/.test(gen.textContent) && /WhatsApp/.test(gen.textContent));
+    registrar("M3. texto incluye la idea", gen.querySelector("textarea").value.includes("$25.000"));
+
+    const btnC = gen.querySelector(".gen-bloque button");
+    win.copiarTexto(btnC);
+    await esperar(100);
+    registrar("M4. botón 'Copiar' cambia a 'Copiado'", btnC.textContent.includes("Copiado"));
+
+    registrar("EX. tiempo total", true, ((Date.now() - t0) / 1000).toFixed(1) + "s");
+    fin();
+  } catch (e) {
+    registrar("EX. excepción en la suite", false, String(e));
+    fin();
+  }
+};
+setTimeout(fin, 60000);
+</script>
+</body>
+</html>
