@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MarketAttack · Demo — {NOMBRE}</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<header>
+  <div class="contenedor-header">
+    <div class="logo">⚡ MARKETATTACK <span>· Tienda Demo IA</span></div>
+    <nav>
+      <a href="index.html">Inicio</a>
+      <a href="#chat" class="activo">Chat</a>
+      <a href="#panel">Panel</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#marketing">Marketing</a>
+    </nav>
+  </div>
+</header>
+
+<div class="contenedor">
+
+  <h1 class="titulo-seccion">🍔 Market Burger — Asistente de atención y captación</h1>
+  <p class="subtitulo-seccion">Esta es una empresa ficticia de prueba. Prueba el flujo: pregunta, pide la promo, registra tus datos y mira el panel del "dueño".</p>
+
+  <!-- TABS -->
+  <div class="tabs" id="tabs" role="tablist">
+    <button class="tab activo" data-tab="chat">💬 Chat del cliente</button>
+    <button class="tab" data-tab="panel">🏪 Panel (mini-CRM)</button>
+    <button class="tab" data-tab="dashboard">📊 Dashboard</button>
+    <button class="tab" data-tab="marketing">📣 Marketing IA</button>
+  </div>
+
+  <!-- PESTAÑA CHAT -->
+  <div class="pestana activa" id="chat">
+    <div class="ventana-chat">
+      <div class="cabecera-chat">
+        <div class="avatar">🍔</div>
+        <div class="datos">
+          <div class="nombre">Market Burger</div>
+          <div class="estado-sitio"><span class="punto-en-linea"></span> En línea · responde al instante</div>
+        </div>
+      </div>
+      <div class="chat" id="chat-canvas"></div>
+      <div class="campo-chat">
+        <input type="text" id="entrada" placeholder="Escribe tu mensaje, ej: ¿qué venden?" autocomplete="off">
+        <button class="boton accion" onclick="enviarMensaje()" title="Enviar">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PESTAÑA PANEL -->
+  <div class="pestana" id="panel">
+    <div class="panel-card">
+      <h3>📥 Prospectos captados por el chat</h3>
+      <div class="filtros" id="filtros">
+        <button class="boton secundario" onclick="filtrar('todos')">Todos</button>
+        <button class="boton secundario" onclick="filtrar('nuevo')">Nuevos</button>
+        <button class="boton secundario" onclick="filtrar('contactado')">Contactados</button>
+        <button class="boton secundario" onclick="filtrar('vendido')">Vendidos</button>
+      </div>
+      <ul class="lista-prospectos" id="lista-prospectos">
+        <li class="vacio">Aún no hay prospectos. Pide una promo en el chat para captar el primero.</li>
+      </ul>
+      <button class="boton exito" onclick="exportarCSV()">⬇ Exportar CSV</button>
+      <button class="boton" onclick="limpiarProspectos()" style="margin-left:8px;background:#e63946;">Eliminar todos (demo)</button>
+    </div>
+    <div class="panel-card">
+      <h3>💡 Para probar la demo</h3>
+      <p>1. Ve a la pestaña 💬 Chat.<br>
+         2. Escribe: <em>"¿qué venden?"</em>, <em>"¿horarios?"</em> o directamente <em>"quiero la promo"</em>.<br>
+         3. Responde con un nombre, luego un teléfono y luego tu interés.<br>
+         4. Vuelve aquí: verás el prospecto registrado y podrás cambiar su estado (Nuevo → Contactado → Vendido).</p>
+    </div>
+  </div>
+
+  <!-- PESTAÑA DASHBOARD -->
+  <div class="pestana" id="dashboard">
+    <h2 class="titulo-seccion">📊 Dashboard del negocio</h2>
+    <div class="grid-metricas" id="metricas"></div>
+    <div class="panel-card">
+      <h3>📈 Entendiendo el valor para el dueño</h3>
+      <p>En un negocio real, estas cifras llegan solas: cuántos conversaron, cuántos dejaron sus datos y cuántos se convirtieron en venta. Eso es lo que MarketAttack visibiliza automáticamente.</p>
+    </div>
+  </div>
+
+  <!-- PESTAÑA MARKETING -->
+  <div class="pestana" id="marketing">
+    <div class="panel-card">
+      <h3>📣 Genera contenido desde una idea</h3>
+      <p>Escribe una promoción o noticia y MarketAttack genera textos para cada canal. Ejemplo: <em>"Tenemos promoción de hamburguesa + bebida por $25.000 este viernes"</em>. <small style="color:#777;">(Demo con plantillas, la IA real llega en V4)</small></p>
+      <div class="gen-area">
+        <textarea id="idea-input" rows="3" placeholder="Describe tu promoción o novedad..."></textarea>
+        <button class="boton" onclick="generarMarketing()">✨ Generar contenido</button>
+      </div>
+      <div class="resultados-gen" id="resultados-gen"></div>
+    </div>
+  </div>
+
+</div>
+
+<a class="wa-flotante" href="https://wa.me/573209226563" target="_blank" rel="noopener">💬 Pedir por WhatsApp</a>
+
+
+<script>
+/* ============ ESTADO LOCAL DE LA PÁGINA ============ */
+let intencionActual = "";
+let ultimoTextoCliente = "";
+
+/* ============ ALMACENAMIENTO (usa la base del CLIENTE) ============ */
+function leerProspectosLocal() {
+  return MarketAttack.leerProspectos();
+}
+
+function buscarPorId(lista, id) {
+  return lista.find(p => p.id === id);
+}
+
+/* ============ CHAT ============ */
+function horaActual() {
+  return new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+}
+
+function agregarMensaje(tipo, texto, conChips, conEscribiendo) {
+  const chat = document.getElementById("chat-canvas");
+  const div = document.createElement("div");
+  div.className = "msg " + tipo;
+
+  if (tipo === "ia" || tipo === "sistema") {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar-msg";
+    avatar.textContent = "🍔";
+    div.appendChild(avatar);
+  }
+
+  const col = document.createElement("div");
+  col.style.maxWidth = "100%";
+
+  const burbuja = document.createElement("div");
+  burbuja.className = "burbuja";
+  burbuja.innerHTML = escapar(texto)
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/\n/g, "<br>");
+  col.appendChild(burbuja);
+
+  const hora = document.createElement("span");
+  hora.className = "hora";
+  hora.textContent = horaActual();
+  col.appendChild(hora);
+
+  div.appendChild(col);
+  chat.appendChild(div);
+
+  if (tipo === "cliente") {
+    const avatar = document.createElement("div");
+    avatar.className = "avatar-msg";
+    avatar.textContent = "👤";
+    div.appendChild(avatar);
+  }
+
+  if (conChips && Array.isArray(conChips) && conChips.length) {
+    const chips = document.createElement("div");
+    chips.className = "acciones-rapidas";
+    conChips.forEach(op => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = op;
+      b.onclick = () => { agregarMensaje("cliente", op); procesarConsulta(op); };
+      chips.appendChild(b);
+    });
+    col.appendChild(chips);
+  }
+
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+function mostrarEscribiendo() {
+  const chat = document.getElementById("chat-canvas");
+  const div = document.createElement("div");
+  div.className = "msg ia escribiendo-msg";
+  const avatar = document.createElement("div");
+  avatar.className = "avatar-msg";
+  avatar.textContent = "🍔";
+  div.appendChild(avatar);
+  const burbuja = document.createElement("div");
+  burbuja.className = "burbuja escribiendo";
+  for (let i = 0; i < 3; i++) {
+    const punto = document.createElement("span");
+    punto.className = "punto";
+    burbuja.appendChild(punto);
+  }
+  div.appendChild(burbuja);
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+function escapar(t) {
+  const d = document.createElement("div");
+  d.textContent = t;
+  return d.innerHTML;
+}
+
+function procesarConsulta(texto) {
+  ultimoTextoCliente = texto;
+  responderConEspera();
+}
+
+function responderConEspera() {
+  const espera = mostrarEscribiendo();
+  const retraso = 700 + Math.random() * 500;
+  setTimeout(() => {
+    espera.remove();
+    procesarRespuestaInterna();
+  }, retraso);
+}
+
+function respuestaIA(texto, chips) {
+  responderConEsperaCon(texto, chips);
+}
+
+function responderConEsperaCon(iaTexto, chips) {
+  const espera = mostrarEscribiendo();
+  setTimeout(() => {
+    espera.remove();
+    agregarMensaje("ia", iaTexto, chips);
+  }, 600 + Math.random() * 400);
+}
+
+function procesarRespuestaInterna() {
+  const texto = ultimoTextoCliente || "";
+
+  // Si estamos capturando datos, el flujo es estricto
+  if (etapaCaptura) {
+    manejarCaptura(texto);
+    return;
+  }
+
+  const intencion = detectarIntencion(texto);
+  intencionActual = intencion;
+  const respuesta = responderConIntencion(intencion, texto);
+  if (respuesta) {
+    agregarMensaje("ia", respuesta, sugerencias(intencion));
+  }
+}
+
+function sugerencias(intencion) {
+  if (!intencion) {
+    // Primera interacción: ayudamos a romper el hielo
+    return ["¿Qué venden?", "¿Horarios?", "¿Dónde están?", "Quiero la promo"];
+  }
+  switch (intencion) {
+    case "menu": return ["Quiero la promo", "¿Hacen domicilios?", "¿Cuánto demora el reparto?"];
+    case "promocion": return [];
+    case "saludo": return ["¿Qué venden?", "Quiero la promo", "¿Horarios?"];
+    case "pedido": return ["Me interesa el combo familiar", "¿Aceptan tarjeta?"];
+    case "pago": return ["Hace un pedido", "Quiero la promo"];
+    default: return [];
+  }
+}
+
+function manejarCaptura(texto) {
+  if (etapaCaptura === "nombre") {
+    if (texto.trim().length < 2) {
+      respuestaIA("Disculpa, ¿cuál es tu nombre? 😊");
+      return;
+    }
+    prospectoParcial.nombre = texto.trim();
+    etapaCaptura = "telefono";
+    respuestaIA("¡Gracias " + prospectoParcial.nombre + "! 📱 Ahora me compartes tu **NÚMERO DE CELULAR** para contactarte.");
+    return;
+  }
+  if (etapaCaptura === "telefono") {
+    const num = extraerNumero(texto);
+    if (!num) {
+      respuestaIA("Ese número no parece valido 😅. Solo necesito tus dígitos para contactarte. ¿Me lo repites?");
+      return;
+    }
+    prospectoParcial.telefono = num;
+    etapaCaptura = "interes";
+    respuestaIA("¡Genial! 🎉 Y para terminar: ¿qué es lo que más te interesa de " + MarketAttack.CLIENTE.nombreComercial + "? (ej: la promo del viernes, un combo, el domicilio...)");
+    return;
+  }
+  if (etapaCaptura === "interes") {
+    prospectoParcial.interesResumen = texto.trim() || "";
+    guardarProspectoLocal();
+  }
+}
+
+function guardarProspectoLocal() {
+  const lista = leerProspectosLocal();
+  lista.forEach((p, i) => { if (!p.id) p.id = Date.now() + "-" + i; });
+  const nuevo = {
+    id: Date.now() + "-" + lista.length,
+    ...prospectoParcial,
+    estado: "nuevo",
+    fecha: new Date().toLocaleString("es-CO")
+  };
+  lista.push(nuevo);
+  MarketAttack.guardarListaProspectos(lista);
+  const nombre = prospectoParcial.nombre;
+  etapaCaptura = null;
+  prospectoParcial = {};
+  respuestaIA("✅ ¡Listo " + nombre + "! Tu información quedó registrada y el restaurante ya recibió tu oportunidad. En breve te contactamos por WhatsApp. ¡Gracias por preferir " + MarketAttack.CLIENTE.nombreComercial + "! 🍔");
+  actualizarPanel();
+  actualizarDashboard();
+}
+
+function enviarMensaje() {
+  const input = document.getElementById("entrada");
+  const texto = input.value.trim();
+  if (!texto) return;
+  agregarMensaje("cliente", texto);
+  input.value = "";
+  procesarConsulta(texto);
+}
+
+/* ============ PANEL (mini-CRM) ============ */
+let filtroActual = "todos";
+
+function actualizarPanel() {
+  const lista = MarketAttack.idsUnicos();
+  const ul = document.getElementById("lista-prospectos");
+  ul.innerHTML = "";
+  const filtrada = filtroActual === "todos" ? lista : lista.filter(p => p.estado === filtroActual);
+
+  if (filtrada.length === 0) {
+    ul.innerHTML = '<li class="vacio">No hay prospectos' + (filtroActual !== "todos" ? " en este estado" : "") + '.</li>';
+    return;
+  }
+
+  const etiquetas = { nuevo: "Nuevo", contactado: "Contactado", vendido: "Vendido" };
+
+  filtrada.forEach(p => {
+    const li = document.createElement("li");
+    li.innerHTML =
+      '<div class="info"><strong>' + escapar(p.nombre || "Sin nombre") + '</strong> — ' +
+      escapar(p.telefono || "-") + '<br><small style="color:#777;">Interés: ' +
+      escapar(p.interes || p.interesResumen || "-") + ' · ' + escapar(p.fecha || "-") + '</small></div>';
+
+    const sel = document.createElement("select");
+    sel.className = "estado " + p.estado;
+    Object.keys(etiquetas).forEach(k => {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = etiquetas[k];
+      if (k === p.estado) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => {
+      sel.className = "estado " + sel.value;
+      MarketAttack.cambiarEstadoProspecto(p.id, sel.value);
+      actualizarDashboard();
+    };
+
+    const btn = document.createElement("button");
+    btn.textContent = "✕";
+    btn.onclick = () => { MarketAttack.eliminarProspecto(p.id); actualizarPanel(); actualizarDashboard(); };
+    btn.style.cssText = "border:none;background:transparent;cursor:pointer;color:#e63946;font-weight:700;";
+
+    const ctrl = document.createElement("div");
+    ctrl.style.cssText = "display:flex;gap:6px;align-items:center;";
+    ctrl.appendChild(sel);
+    ctrl.appendChild(btn);
+    li.appendChild(ctrl);
+    ul.appendChild(li);
+  });
+}
+
+function filtrar(estado) {
+  filtroActual = estado;
+  document.querySelectorAll("#filtros .boton").forEach(b => b.removeAttribute("style"));
+  actualizarPanel();
+}
+
+function exportarCSV() {
+  const lista = MarketAttack.idsUnicos();
+  if (!lista.length) { alert("No hay prospectos para exportar."); return; }
+  const filas = [["Nombre", "Teléfono", "Interés", "Estado", "Fecha"]];
+  lista.forEach(p => filas.push([p.nombre, p.telefono, p.interes || "", p.estado, p.fecha]));
+  const csv = "\uFEFF" + filas.map(f => f.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "prospectos_" + MarketAttack.CLIENTE.nombreInterno + ".csv";
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function limpiarProspectos() {
+  if (!confirm("¿Seguro que quieres eliminar todos los prospectos de la demo?")) return;
+  MarketAttack.limpiarProspectos();
+  actualizarPanel();
+  actualizarDashboard();
+}
+
+/* ============ DASHBOARD ============ */
+function actualizarDashboard() {
+  const lista = MarketAttack.idsUnicos();
+  const nuevos = lista.filter(p => p.estado === "nuevo").length;
+  const contactados = lista.filter(p => p.estado === "contactado").length;
+  const vendidos = lista.filter(p => p.estado === "vendido").length;
+  const total = lista.length;
+  const conversion = total ? Math.round((vendidos / total) * 100) : 0;
+
+  const c = document.getElementById("metricas");
+  c.innerHTML = [
+    { n: total, e: "Prospectos totales" },
+    { n: nuevos, e: "Nuevos por atender" },
+    { n: contactados, e: "Contactados" },
+    { n: vendidos, e: "Vendidos" },
+    { n: conversion + "%", e: "Conversión" }
+  ].map(m => '<div class="metrica"><div class="numero">' + m.n + '</div><div class="etiqueta">' + m.e + "</div></div>").join("");
+}
+
+/* ============ MARKETING ============ */
+function generarMarketing() {
+  const idea = document.getElementById("idea-input").value.trim();
+  if (!idea) { alert("Escribe primero la promoción o novedad."); return; }
+  const textos = MarketAttack.generarContenido(idea);
+  const cont = document.getElementById("resultados-gen");
+  cont.innerHTML = "";
+  textos.forEach(t => {
+    const div = document.createElement("div");
+    div.className = "gen-bloque";
+    div.innerHTML = '<h4>' + t.canal + '</h4><textarea rows="4" readonly>' + escapar(t.texto) + '</textarea><button class="boton" style="margin-top:8px;" onclick="copiarTexto(this)">📋 Copiar</button>';
+    cont.appendChild(div);
+  });
+  cont.insertAdjacentHTML("afterbegin",
+    '<div class="gen-bloque" style="background:#eafaf1;border:1px solid #a9dfbf;"><span class="verde">✓ Generado por MarketAttack.</span> Recuerden: IA genera → humano revisa → humano aprueba → se publica. <small style="color:#777;">(Demo con plantillas, no es IA real aún)</small></div>');
+}
+
+function copiarTexto(btn) {
+  const ta = btn.parentElement.querySelector("textarea");
+  ta.select();
+  document.execCommand("copy");
+  btn.textContent = "✓ Copiado";
+  setTimeout(() => btn.textContent = "📋 Copiar", 1500);
+}
+
+/* ============ TABS ============ */
+(function tabs() {
+  const tabs = document.querySelectorAll(".tab");
+  const pestanas = document.querySelectorAll(".pestana");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      tabs.forEach(t => t.classList.remove("activo"));
+      pestanas.forEach(p => p.classList.remove("activa"));
+      tab.classList.add("activo");
+      document.getElementById(tab.dataset.tab).classList.add("activa");
+    });
+  });
+})();
+
+/* ============ INICIO ============ */
+(function iniciar() {
+  actualizarPanel();
+  actualizarDashboard();
+  const sugerencias = ["¿Qué venden?", "¿Horarios?", "¿Dónde están?", "Quiero la promo"];
+  agregarMensaje("ia", "¡Hola! Soy el asistente de **🍔 " + MarketAttack.CLIENTE.nombreComercial + "** 😊 Puedo decirte el menú, precios, horarios, ubicación o contarte la promo del viernes. ¿Qué deseas saber?", sugerencias);
+  document.getElementById("entrada").addEventListener("keydown", e => { if (e.key === "Enter") enviarMensaje(); });
+})();
+</script>
+
+  
+<script>// demo (inline)
+/* =========================================================================
+   MARKETATTACK — TIENDA DEMO IA
+   Lógica compartida (base reutilizable).
+   Para un CLIENTE NUEVO solo se cambia el objeto CLIENTE abajo.
+   ========================================================================= */
+
+/* -------------------------------------------------------------------------
+   1. CONFIGURACIÓN DEL CLIENTE (cambiar por cada negocio)
+   ------------------------------------------------------------------------- */
+const CLIENTE = {
+  nombreComercial: "Market Burger",
+  nombreInterno: "marketburger", // usado como prefijo del almacenamiento
+  whatsapp: "573209226563",      // número de contacto (curiosamente es el del titular)
+  marca: {
+    tagline: "Las mejores hamburguesas de Ciudad Verde",
+    tono: "amigable y cercano"
+  },
+  info: {
+    horario: "Lunes a domingo de 11:00 a. m. a 10:00 p. m.",
+    ubicacion: "Calle 33 #37-41, Barrio Ciudad Verde, Soacha (Cundinamarca)",
+    contacto: "Pedidos y reservas: 320 922 6563"
+  },
+  menu: [
+    { nombre: "Hamburguesa Clásica", precio: "$18.000", desc: "Carne 120 g, queso, lechuga, tomate" },
+    { nombre: "Hamburguesa Doble", precio: "$24.000", desc: "Doble carne, doble queso, cebolla caramelizada" },
+    { nombre: "Hamburguesa BBQ", precio: "$22.000", desc: "Salsa BBQ, aros de cebolla, tocineta" },
+    { nombre: "Perro Sencillo", precio: "$12.000", desc: "Salchicha, papitas, salsas" },
+    { nombre: "Perro Especial", precio: "$16.000", desc: "Salchicha, papitas, queso, tocineta" },
+    { nombre: "Papas + Bebida", precio: "$10.000", desc: "Porción de papas con malteada/gaseosa" },
+    { nombre: "Combo Familiar", precio: "$65.000", desc: "4 hamburguesas + papas + gaseosa 1 L" }
+  ],
+  promociones: [
+    { titulo: "PROMO DEL VIERNES", texto: "Hamburguesa + bebida por solo $25.000. Solo este viernes." }
+  ],
+  preguntasFrecuentes: [
+    { p: "¿Cuánto demora el domicilio?", r: "Entre 30 y 45 minutos en Ciudad Verde y alrededores, según el destino." },
+    { p: "¿Aceptan pagos con tarjeta?", r: "Sí, aceptamos efectivo, tarjetas y datos de pago por trasferencia." },
+    { p: "¿Tienen opciones vegetarianas?", r: "Próximamente tendremos opciones veggie. Hoy las papas y bebidas son libres de carne." }
+  ]
+};
+
+/* Simula una IA real: junto a este demo se conectará un modelo (V4+).
+   Aquí usamos reglas y plantillas para mostrar el flujo completo y barato. */
+const KEY = "prospectos_" + CLIENTE.nombreInterno;
+
+const ETAPAS_CAPTURA = ["nombre", "telefono", "interes"];
+
+/* -------------------------------------------------------------------------
+   2. ESTADO DE LA SESIÓN
+   ------------------------------------------------------------------------- */
+let etapaCaptura = null;         // null | "nombre" | "telefono" | "interes"
+let prospectoParcial = {};
+let conversacion = [];
+
+/* -------------------------------------------------------------------------
+   3. MOTOR DE RESPUESTAS (reglas + plantillas)
+   ------------------------------------------------------------------------- */
+const RESPONSES = {
+  saludo: [
+    "¡Hola! Bienvenido a {negocio} 😊 Soy el asistente virtual. Te ayudo con el menú, precios, horarios, ubicación y promociones. ¿Qué deseas saber?",
+    "¡Hola! 😊 Gracias por escribirnos. ¿En qué podemos ayudarte? Puedes preguntar por el menú o la promo del viernes."
+  ],
+  despedida: ["¡Gracias por escribirnos! Que tengas un excelente día 🌟", "¡Fue un gusto atenderte! Estamos para lo que necesites 🙌"],
+  gracias: ["¡Con gusto! 😊 ¿Quieres pedir algo o te interesa alguna promoción?", "¡Para eso estamos! 🍔 ¿Te preparo una orden?"],
+  default: [
+    "No estoy seguro de entenderte 😅. Por ejemplo, puedo decirte el menú, los precios, el horario o contarte la promo del viernes. ¿Sobre qué quieres saber?"
+  ]
+};
+
+function rellenar(texto, extra) {
+  let t = texto.replace("{negocio}", CLIENTE.nombreComercial);
+  if (extra) for (const k in extra) t = t.replaceAll("{" + k + "}", extra[k]);
+  return t;
+}
+
+function obtenerMenu() {
+  const lineas = CLIENTE.menu.map(m => "🍔 " + m.nombre + " — " + m.precio + "\n   " + m.desc);
+  return "Nuestro menú:\n" + lineas.join("\n") + "\n\n" + promocionActual() + "\n¿Te interesa alguna de estas opciones? 😊";
+}
+
+function promocionActual() {
+  if (!CLIENTE.promociones.length) return "";
+  const p = CLIENTE.promociones[0];
+  return "🎉 " + p.titulo + ": " + p.texto;
+}
+
+function detectarIntencion(texto) {
+  const t = texto.toLowerCase();
+  if (/(hola|buenas|buenos días|buenas tardes|buenas noches|hey|qué más|bienvenido)/.test(t)) return "saludo";
+  if (/(menu|carta|hamburguesa|perro|papas|combo|comida|precios|precio|productos|cuánto cuesta|qué venden|que venden|qué tienen|que tienen)/.test(t)) return "menu";
+  if (/(horario|horarios|abren|cierran|abierto|cuándo abren)/.test(t)) return "horario";
+  if (/(ubicación|ubicacion|dirección|direccion|dónde|donde|cuál es la ubicación|mapa)/.test(t)) return "ubicacion";
+  if (/(promo|promoción|promocion|oferta|descuento|especial|combo.*promo|viernes)/.test(t)) return "promocion";
+  if (/(reparto|cuánto demora|cuanto demora|demora|llega|tiempo d)/.test(t)) return "reparto";
+  if (/(pago|pagar|tarjeta|efectivo|transferencia)/.test(t)) return "pago";
+  if (/(pedir|pedido|domicilio|envio|envío|comprar|reservar|reserva|cotizar)/.test(t)) return "pedido";
+  if (/(vegetariano|veggie|opciones sin carne|sin carne)/.test(t)) return "vegetariano";
+  if (/(gracias|muchas gracias|perfecto|ok|de acuerdo|genial|excelente)/.test(t)) return "gracias";
+  if (/(adiós|adios|chao|hasta luego|nos vemos|gracias.*adios)/.test(t)) return "despedida";
+  return "desconocido";
+}
+
+function responderConIntencion(intencion, texto) {
+  switch (intencion) {
+    case "saludo": return aleatorio(RESPONSES.saludo);
+    case "menu": return obtenerMenu();
+    case "horario": return "📍 Nuestro horario:\n" + CLIENTE.info.horario + "\n\n¿Quieres que te cuente el menú o la promo del viernes?";
+    case "ubicacion": return "📍 Estamos en: " + CLIENTE.info.ubicacion + "\n\n" + CLIENTE.info.contacto;
+    case "promocion": return iniciarCaptura("Promoción del viernes: " + CLIENTE.promociones[0].texto);
+    case "pedido": return "¡Claro! 🛵 Hacemos pedidos y domicilios.\n\n" + obtenerMenu() + "\n\nCuéntame qué te gustaría pedir.";
+    case "pago": return "💳 Aceptamos efectivo, tarjeta y por transferencia. Al confirmar tu pedido te indicamos todos los medios.";
+    case "reparto": return preguntasRapidas("reparto");
+    case "vegetariano": return preguntasRapidas("vegetariano");
+    case "gracias": return aleatorio(RESPONSES.gracias);
+    case "despedida": return aleatorio(RESPONSES.despedida);
+    default: {
+      // Si el cliente menciona algo que parece un interés/compra, invita a capturar
+      if (/(promo|oferta|quiero|me interesa|cuánto|cuanto|comprar)/.test(texto.toLowerCase())) {
+        return iniciarCaptura(texto.trim());
+      }
+      return aleatorio(RESPONSES.default);
+    }
+  }
+}
+
+function preguntasRapidas(tema) {
+  const r = CLIENTE.preguntasFrecuentes.find(r => tema === "reparto" ? r.p.includes("domicilio") : r.p.includes("vegetariano"));
+  return r ? r.r : "Déjame verificarlo contigo 😊";
+}
+
+function iniciarCaptura(interes) {
+  etapaCaptura = "nombre";
+  prospectoParcial = { interes };
+  return "¡Perfecto! 🎉 Para registrar tu interés y que el dueño te contacte rápido, necesito primero tu **NOMBRE**, por favor 😊";
+}
+
+function extraerNumero(texto) {
+  const nums = texto.replace(/[^\d+]/g, "");
+  return nums.length >= 7 ? nums.slice(0, 13) : null;
+}
+
+function guardarProspecto() {
+  const p = { ...prospectoParcial, estado: "nuevo", fecha: new Date().toLocaleString("es-CO") };
+  const lista = leerProspectos();
+  lista.push(p);
+  localStorage.setItem(KEY, JSON.stringify(lista));
+  const nombre = prospectoParcial.nombre;
+  etapaCaptura = null;
+  prospectoParcial = {};
+  return "✅ ¡Listo " + nombre + "! Tu información quedó registrada y el restaurante ya recibió tu oportunidad. En breve te contactamos por WhatsApp. ¡Gracias por preferir " + CLIENTE.nombreComercial + "! 🍔";
+}
+
+/* -------------------------------------------------------------------------
+   4. ALMACENAMIENTO DE PROSPECTOS (mini-CRM)
+   ------------------------------------------------------------------------- */
+function leerProspectos() {
+  try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; }
+}
+
+function guardarListaProspectos(lista) {
+  localStorage.setItem(KEY, JSON.stringify(lista));
+}
+
+function cambiarEstadoProspecto(id, nuevoEstado) {
+  const lista = leerProspectos();
+  const p = lista.find(x => x.id === id);
+  if (p) { p.estado = nuevoEstado; guardarListaProspectos(lista); }
+}
+
+function eliminarProspecto(id) {
+  guardarListaProspectos(leerProspectos().filter(x => x.id !== id));
+}
+
+function limpiarProspectos() {
+  localStorage.removeItem(KEY);
+}
+
+/* -------------------------------------------------------------------------
+   5. FUNCIONALIDADES COMPARTIDAS
+   ------------------------------------------------------------------------- */
+function aleatorio(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function idsUnicos() {
+  const lista = leerProspectos();
+  lista.forEach((p, i) => { if (!p.id) p.id = Date.now() + "-" + i; });
+  guardarListaProspectos(lista);
+  return lista;
+}
+
+function templateProps() {
+  return {
+    negocio: CLIENTE.nombreComercial,
+    whatsapp: CLIENTE.whatsapp,
+    menu: CLIENTE.menu,
+    inf: CLIENTE.info,
+    promo: CLIENTE.promociones[0]
+  };
+}
+
+/* -------------------------------------------------------------------------
+   6. GENERADOR DE MARKETING (plantillas por canal)
+   ------------------------------------------------------------------------- */
+function generarContenido(idea) {
+  const t = templateProps();
+  return [
+    {
+      canal: "📸 Instagram",
+      texto: `🔥 ¡ALERTA DE PROMO! 🔥\n\n${idea}\n\n¿No quieres perderte esta oferta? Escríbenos YA al WhatsApp y asegura la tuya. 🍔🥤\n\n📍 ${t.inf.ubicacion}\n⏰ ${t.inf.horario}\n\n#Promo #${CLIENTE.nombreComercial.replace(/\s/g, "")} #ComidaRica #Soacha`
+    },
+    {
+      canal: "📘 Facebook",
+      texto: `📌 Estamos de promoción este fin de semana.\n\n${idea}\n\nPide por inbox, déjanos tu nombre y teléfono, y te contactamos en minutos. 🚀\n\n${CLIENTE.nombreComercial} — Atención rápida y domicilios.`
+    },
+    {
+      canal: "💬 WhatsApp (broadcast)",
+      texto: `Hola 👋 Somos ${CLIENTE.nombreComercial}. Tenemos una oferta especialmente para ti:\n\n${idea}\n\n¡Responde este mensaje con tu nombre y teléfono para reservar la tuya! 🍔`
+    },
+    {
+      canal: "🦋 Historias (CTA)",
+      texto: `🔥 Quiero la promo → [ENLACE WHATSAPP]\n\n${idea}\n\nSolo por tiempo limitado ⏰`
+    }
+  ];
+}
+
+/* Exportar funciones útiles para páginas nuevas */
+window.MarketAttack = {
+  CLIENTE,
+  KEY,
+  ETAPAS_CAPTURA,
+  leerProspectos,
+  guardarListaProspectos,
+  cambiarEstadoProspecto,
+  eliminarProspecto,
+  limpiarProspectos,
+  idsUnicos,
+  generarContenido,
+  generarIdea: () => CLIENTE.promociones[0] ? CLIENTE.promociones[0].texto : ""
+};
+</script>
+<script>// carrito (inline)
+/* ============================================================================
+   🛒 CARRITO + MÉTODOS DE PAGO + REDES SOCIALES — MARKETATTACK
+   Módulo autocontenido e inyectable. Cero dependencia de la estructura del chat.
+   ============================================================================ */
+(function () {
+  "use strict";
+
+  if (document.getElementById("carrito-root")) return;
+
+  var CARRITO = [];
+  var medioSel = "";
+
+  function total() {
+    return CARRITO.reduce(function (ac, i) { return ac + (parsePrecio(i.precio) * (i.cant || 1)); }, 0);
+  }
+  function contar() {
+    return CARRITO.reduce(function (ac, i) { return ac + (i.cant || 1); }, 0);
+  }
+  function parsePrecio(s) {
+    var n = parseInt(String(s).replace(/[^0-9]/g, ""), 10);
+    return isNaN(n) ? 0 : n;
+  }
+  function moneda(n) { return "$" + n.toLocaleString("es-CO"); }
+
+  var css = document.createElement("style");
+  css.textContent = [
+    "#carrito-root{position:fixed;bottom:16px;right:16px;z-index:99999;font-family:system-ui,sans-serif;max-width:94vw}",
+    "#carrito-boton{background:#e63946;color:#fff;border:none;border-radius:999px;padding:13px 18px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;align-items:center;gap:8px}",
+    "#carrito-boton .n{background:#fff;color:#e63946;border-radius:999px;padding:0 9px;font-size:13px;font-weight:800}",
+    "#carrito-panel{position:fixed;bottom:78px;right:18px;width:min(340px,92vw);max-height:70vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.3);padding:16px;display:none}",
+    "#carrito-panel.abierto{display:block}",
+    "#carrito-panel h3{margin:0 0 10px;font-size:16px;color:#111}",
+    ".car-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px dashed #eee;font-size:13.5px;gap:8px}",
+    ".car-item .lbl{flex:1;color:#222}",
+    ".car-item .prec{font-weight:700;color:#e63946;white-space:nowrap}",
+    ".car-q{display:flex;align-items:center;gap:6px;color:#333}",
+    ".car-q button{background:#f0f0f0;border:none;border-radius:6px;width:23px;height:23px;cursor:pointer;font-weight:700}",
+    "#carrito-total{font-weight:800;font-size:16px;text-align:right;margin:10px 0;color:#111}",
+    "#carrito-pago{width:100%;background:#27ae60;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;display:none}",
+    "#carrito-medios{margin-top:12px;border-top:1px solid #eee;padding-top:10px}",
+    "#carrito-medios h4{margin:0 0 8px;font-size:14px;color:#333}",
+    ".medio{display:flex;align-items:center;justify-content:space-between;border:1.5px solid #e0e0e0;border-radius:9px;padding:9px 12px;margin:5px 0;cursor:pointer;font-size:13.5px}",
+    ".medio.seleccionado{border-color:#27ae60;background:#eafaf1}",
+    ".medio .sel{width:14px;height:14px;border-radius:50%;border:2px solid #ccc;display:inline-block}",
+    ".medio.seleccionado .sel{border-color:#27ae60;background:#27ae60}",
+    "#carrito-confirmar{width:100%;background:#e63946;color:#fff;border:none;border-radius:10px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;display:none}",
+    "#carrito-ok{margin-top:10px;background:#eafaf1;border:1px solid #27ae60;border-radius:9px;padding:11px;font-size:13.5px;color:#145a2b;display:none}",
+    "#carrito-vacio{color:#999;font-size:13px;text-align:center;padding:14px 0}",
+    "#carrito-redes{margin-top:12px;border-top:1px solid #eee;padding-top:10px}",
+    "#carrito-redes h4{margin:0 0 8px;font-size:14px;color:#333}",
+    ".red-btna{display:block;width:100%;text-align:left;background:#f5f5f5;border:none;border-radius:8px;padding:9px 11px;margin:4px 0;cursor:pointer;font-size:13px;color:#222}",
+    ".red-btna:hover{background:#ececec}"
+  ].join("\n");
+  (document.head || document.documentElement).appendChild(css);
+
+  var root = document.createElement("div");
+  root.id = "carrito-root";
+  root.innerHTML =
+    '<div id="carrito-panel">' +
+    '  <h3>🛒 Tu pedido</h3>' +
+    '  <div id="carrito-items"><p id="carrito-vacio">Tu carrito está vacío. Elige algo del menú 👇</p></div>' +
+    '  <div id="carrito-total" style="display:none">Total: <span id="carrito-total-val">$0</span></div>' +
+    '  <button id="carrito-pago">💳 Elegir método de pago</button>' +
+    '  <div id="carrito-medios" style="display:none">' +
+    '    <h4>¿Cómo vas a pagar?</h4>' +
+    '    <div class="medio" data-medio="Efectivo al recibir"><span>💵 Efectivo al recibir</span><span class="sel"></span></div>' +
+    '    <div class="medio" data-medio="Tarjeta débito/crédito"><span>💳 Tarjeta (débito/crédito)</span><span class="sel"></span></div>' +
+    '    <div class="medio" data-medio="Nequi o transferencia"><span>🏦 Nequi / transferencia</span><span class="sel"></span></div>' +
+    '  </div>' +
+    '  <button id="carrito-confirmar">✅ Confirmar pedido</button>' +
+    '  <div id="carrito-ok"></div>' +
+    '  <div id="carrito-redes">' +
+    '    <h4>📲 Síguenos y pide por redes</h4>' +
+    '    <button class="red-btna" data-red="https://wa.me/3209226563?text=Hola,%20quiero%20pedir">💬 WhatsApp: 320 922 6563</button>' +
+    '    <button class="red-btna" data-red="https://instagram.com">📸 Instagram</button>' +
+    '    <button class="red-btna" data-red="https://facebook.com">📘 Facebook</button>' +
+    '    <button class="red-btna" data-red="https://tiktok.com">🎵 TikTok</button>' +
+    '  </div>' +
+    '</div>' +
+    '<button id="carrito-boton">🛒 Pedido <span class="n" id="carrito-cont">0</span></button>';
+
+  document.body.appendChild(root);
+
+  var panel = document.getElementById("carrito-panel");
+  var itemsEl = document.getElementById("carrito-items");
+  var contEl = document.getElementById("carrito-cont");
+  var totalEl = document.getElementById("carrito-total");
+  var totalVal = document.getElementById("carrito-total-val");
+  var pagoBtn = document.getElementById("carrito-pago");
+  var mediosEl = document.getElementById("carrito-medios");
+  var confirmarBtn = document.getElementById("carrito-confirmar");
+  var okEl = document.getElementById("carrito-ok");
+
+  function render() {
+    contEl.textContent = contar();
+    if (CARRITO.length === 0) {
+      itemsEl.innerHTML = '<p id="carrito-vacio">Tu carrito está vacío. Elige algo del menú 👇</p>';
+      totalEl.style.display = "none";
+      pagoBtn.style.display = "none";
+      mediosEl.style.display = "none";
+      confirmarBtn.style.display = "none";
+      okEl.style.display = "none";
+      return;
+    }
+    itemsEl.innerHTML = CARRITO.map(function (i, idx) {
+      return '<div class="car-item">' +
+        '<span class="lbl">' + i.nombre + '</span>' +
+        '<span class="prec">' + moneda(parsePrecio(i.precio) * (i.cant || 1)) + '</span>' +
+        '<span class="car-q"><button data-menos="' + idx + '">−</button> ' + (i.cant || 1) + ' <button data-mas="' + idx + '">+</button></span>' +
+        '</div>';
+    }).join("");
+    totalVal.textContent = moneda(total());
+    totalEl.style.display = "block";
+    pagoBtn.style.display = "block";
+    okEl.style.display = "none";
+  }
+
+  itemsEl.addEventListener("click", function (e) {
+    var mas = e.target.getAttribute("data-mas");
+    var menos = e.target.getAttribute("data-menos");
+    if (mas !== null) { CARRITO[+mas].cant = (CARRITO[+mas].cant || 1) + 1; render(); }
+    if (menos !== null) {
+      CARRITO[+menos].cant = (CARRITO[+menos].cant || 1) - 1;
+      if (CARRITO[+menos].cant <= 0) CARRITO.splice(+menos, 1);
+      render();
+    }
+  });
+
+  document.getElementById("carrito-boton").addEventListener("click", function () {
+    panel.classList.toggle("abierto");
+  });
+
+  pagoBtn.addEventListener("click", function () { mediosEl.style.display = "block"; });
+
+  mediosEl.addEventListener("click", function (e) {
+    var m = e.target.closest(".medio");
+    if (!m) return;
+    mediSel = m.getAttribute("data-medio");
+    var all = mediosEl.querySelectorAll(".medio");
+    for (var i = 0; i < all.length; i++) all[i].classList.remove("seleccionado");
+    m.classList.add("seleccionado");
+    confirmarBtn.style.display = "block";
+    okEl.style.display = "none";
+  });
+
+  confirmarBtn.addEventListener("click", function () {
+    if (!mediSel) {
+      okEl.textContent = "❗ Primero elige un método de pago arriba.";
+      okEl.style.display = "block";
+      okEl.style.borderColor = "#e63946";
+      okEl.style.background = "#fdecea";
+      okEl.style.color = "#8a1a20";
+      return;
+    }
+    okEl.style.borderColor = "#27ae60";
+    okEl.style.background = "#eafaf1";
+    okEl.style.color = "#145a2b";
+    okEl.textContent = "✅ ¡Pedido confirmado por " + mediSel + " por " + moneda(total()) + "! Lo registramos y te contactamos. 🍔";
+    okEl.style.display = "block";
+    try {
+      var MC = window.MarketAttack;
+      if (MC && MC.guardarListaProspectos) {
+        var lista = (MC.leerProspectos ? MC.leerProspectos() : []);
+        lista.push({
+          id: Date.now() + "-" + Math.floor(Math.random() * 999),
+          nombre: "Cliente (pedido web)",
+          telefono: "—",
+          interes: "Pedido " + moneda(total()) + " · " + mediSel + " · " + CARRITO.map(function (i) { return i.cant + "x " + i.nombre; }).join(", "),
+          estado: "nuevo",
+          fecha: new Date().toLocaleString("es-CO")
+        });
+        MC.guardarListaProspectos(lista);
+      }
+    } catch (e) {}
+    CARRITO = [];
+    render();
+  });
+
+  root.addEventListener("click", function (e) {
+    var rb = e.target.closest(".red-btna");
+    if (rb) { window.open(rb.getAttribute("data-red"), "_blank"); }
+  });
+
+  window.MarketAttackCarrito = {
+    agregar: function (nombre, precio) {
+      var ex = null;
+      for (var i = 0; i < CARRITO.length; i++) { if (CARRITO[i].nombre === nombre) { ex = CARRITO[i]; break; } }
+      if (ex) { ex.cant = (ex.cant || 1) + 1; }
+      else { CARRITO.push({ nombre: nombre, precio: precio, cant: 1 }); }
+      render();
+    }
+  };
+
+  function enlazarMenu() {
+    var items = document.querySelectorAll(".producto, .card, .menu-item, [class*=\"produc\"], [class*=\"menu\"] [class*=\"precio\"], [class*=\"precio\"]");
+    if (!items.length) return;
+    for (var i = 0; i < items.length; i++) {
+      var el = items[i];
+      if (el.getAttribute("data-carro") === "1") continue;
+      var cn = (el.className || "") + " " + (el.textContent || "");
+      var nm = (cn.match(/(Hamburguesa[^\n$]*|Perro[^\n$]*|Papas[^\n$]*|Combo[^\n$]*|Malteada[^\n$]*)/i) || [])[0];
+      var pc = (cn.match(/\$\s?[0-9.,]+/) || [])[0];
+      if (!nm || !pc) continue;
+      el.setAttribute("data-carro", "1");
+      var btn = document.createElement("button");
+      btn.textContent = "🛒 Agregar";
+      btn.style.cssText = "margin-left:8px;background:#e63946;color:#fff;border:none;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer";
+      btn.onclick = function (nombre, precio) { return function (ev) { ev.preventDefault(); ev.stopPropagation(); window.MarketAttackCarrito.agregar(nombre, precio); }; }(nm.trim(), pc);
+      el.appendChild(btn);
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () {
+      enlazarMenu();
+      setInterval(function () { if (!panel.classList.contains("mas")) enlazarMenu(); }, 1500);
+    });
+  } else {
+    enlazarMenu();
+    setInterval(function () { enlazarMenu(); }, 1500);
+  }
+
+  console.log("[carrito] módulo listo ✔");
+})();
+
+</script>
+</body>
+</html>
