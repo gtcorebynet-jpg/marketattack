@@ -24,7 +24,7 @@
 
   var css = document.createElement("style");
   css.textContent = [
-    "#carrito-root{position:fixed;bottom:16px;right:16px;z-index:99999;font-family:system-ui,sans-serif;max-width:94vw}",
+    "#carrito-root{position:fixed;bottom:78px;right:16px;z-index:99999;font-family:system-ui,sans-serif;max-width:94vw}",
     "#carrito-boton{background:#e63946;color:#fff;border:none;border-radius:999px;padding:13px 18px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;align-items:center;gap:8px}",
     "#carrito-boton .n{background:#fff;color:#e63946;border-radius:999px;padding:0 9px;font-size:13px;font-weight:800}",
     "#carrito-panel{position:fixed;bottom:78px;right:18px;width:min(340px,92vw);max-height:70vh;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.3);padding:16px;display:none}",

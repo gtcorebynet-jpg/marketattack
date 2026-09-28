@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenCode server (MARKETATTACK - acceso desde celular)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/personalamd/Documentos/Default Project
+Environment=OPENCODE_SERVER_PASSWORD=CAMBIAR_ESTA
+Environment=HOME=/home/ubuntu
+ExecStart=/usr/local/bin/opencode serve --port 4096 --hostname 127.0.0.1
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/opencode.log
+StandardError=append:/var/log/opencode.log
+
+[Install]
+WantedBy=multi-user.target

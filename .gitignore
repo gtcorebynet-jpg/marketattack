@@ -24,3 +24,21 @@ __pycache__/
 
 # Node
 node_modules/
+# ── Respaldos completos: NUNCA a GitHub (contienen el chat y datos personales)
+# Todos los paquetes/respaldos comprimidos (contienen el chat y datos personales)
+*.zip
+*.tar.gz
+
+# ── Kit de rescate: contiene copias del chat (datos personales)
+07_KIT_RESCATE/chat/
+07_KIT_RESCATE/proyecto/
+
+# ── Bases de datos de opencode (contienen conversaciones y secretos)
+*.db
+*.db-wal
+*.db-shm
+
+# ── Llaves y secretos
+*.key
+*.pem
+*telegram.conf

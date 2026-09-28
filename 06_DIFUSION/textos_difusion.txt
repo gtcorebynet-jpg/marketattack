@@ -1,0 +1,34 @@
+════════════════════════════════════════════
+ MARKETATTACK · KIT DE DIFUSIÓN (copia y pega)
+════════════════════════════════════════════
+
+[1] MENSAJE CORTO — PARA WHATSAPP / HISTORIAS (2 líneas)
+─────────────────────────────
+🛍️ ¡Ahí va! Así de fácil pides a [NEGOCIO]:
+  1) elige tu producto  2) dale a CARRITO
+  3) confirmas por WhatsApp y listo 🚚"
+  👉 <LINK>
+
+[2] MENSAJE PROMO — PARA ESTADO / POST
+─────────────────────────────
+🔥 [PROMO DESTACADA]
+[SERVICIO/PRODUCTO] en #HuellaProveedores
+📍 [ZONA]  · 🕐 [HORARIO]
+🍔 Pide directo por WhatsApp — 3 pasos, cero apps.
+👉 <LINK>
+
+[3] CAPTION LARGO — PARA FACEBOOK / LINKEDIN
+─────────────────────────────
+Atención [RUBRO]:
+De ahora en adelante pedir en [NEGOCIO] es así:
+Ves el producto ➜ tocas CARRITO ➜ tu pedido llega
+listo por WhatsApp. Sin filas, sin apps, sin llamadas.
+📍 Entrega: [ZONA]
+🕐 Horario: [HORARIO]
+📍 Pide aquí 👉 <LINK>
+
+[4] IMAGEN DE PERFIL — coloca el QR_tienda.png (generado aparte) como portada/estado fijo.
+[5] BIOLINK — pon <LINK> en Bio de Instagram/TikTok (gratis, sin pagar nada).
+════════════════════════════════════════════
+ (los corchetes [NEGOCIO], [PROMO], [ZONA], [HORARIO]
+  son los mismos 4 datos del config_cliente.js del cliente)
