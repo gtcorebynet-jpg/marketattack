@@ -100,3 +100,71 @@ ningún agente puede generarla por ti SIN tu token. Verificado, no supuesto.
 - Verdad medida, verificado-contigo (200/200/200), nunca links «prometidos».
 - Respaldo CADA avance; el motor no se toca; práctico y breve.
 - Crecimiento orgánico: solo herramientas con plan GRATIS inicial ($0).
+
+---
+
+## 2026-09-28 · Servicio de tiendas para clientes +/endurecimiento
+
+### Nuevo: crear tiendas con datos por Telegram
+El usuario manda los datos del cliente al bot y el servidor genera la web
+completa (productos, WhatsApp, QR) y devuelve el link.
+
+```
+/cliente
+Nombre: Tienda Don Pepe
+WhatsApp: 573001234567
+Tagline: Los mejores arepas
+Horario: Lun-Sab 8am-8pm
+Zona: Soacha
+1. Arepa con pollo | 12000 | Pollo y queso
+2. Jugo de mango | 5000 | Natural
+```
+Responde con el link `http://149.130.190.118/clientes/<slug>/tienda.html`
+y manda el QR como foto.
+
+Comandos: `/cliente` `/clientes` `/estado` `/respaldos` `/publicar`
+`/backup` `/link` `/qr` `/leer` `/nueva` `/ayuda`
+
+### Herramientas
+| Script | Para qué |
+|---|---|
+| `nuevo_cliente.py` | genera la tienda de un cliente |
+| `verificar_tienda.sh` | audita web + datos + WhatsApp + QR de verdad |
+| `puente_telegram.py` | puente Telegram → opencode |
+
+### Bug corregido: 200 engañoso
+nginx tenía `try_files ... /index.html`, así que **toda** ruta inexistente
+devolvía 200 con la portada. Ahora es `try_files ... =404`.
+`nuevo_cliente.py` tampoco se fía del 200: comprueba que la página
+realmente contenga los datos del cliente y que el QR sea un PNG válido.
+
+### Watchdog v2 (antes solo miraba nginx)
+Cada 5 minutos revisa: nginx, opencode, puente de Telegram, las 3 páginas
+principales, **todas las tiendas de clientes** y el espacio en disco.
+Si algo cae lo reinicia; si una página cae, re-publica.
+Probado matando los 3 servicios: los levantó todos.
+
+### Informe diario a Telegram
+A las 8:00 AM llega el estado: páginas, servicios, número de tiendas,
+respaldos, disco, RAM y resultado de la auditoría.
+
+### Seguridad
+- Llave SSH **vieja eliminada** del servidor (estuvo pegada en el chat).
+  Quedan 2: `marketattack-nueva-20260926` (PC) y `telefono` (Android, solo túnel).
+- Copia: `/home/ubuntu/.ssh/authorized_keys.bak-2026*`
+- Backups con cron + el paquete del cliente se respaldan antes de publicar.
+- `opencode` y el token del bot solo se leen desde el servidor, nunca se mandan.
+
+### Android / Termux
+El puerto 4096 **no** se abre a internet. Acceso por túnel:
+```bash
+ssh -N -L 4096:localhost:4096 -i ~/.ssh/ma_celular ubuntu@149.130.190.118
+```
+Luego, en Chrome del celular:
+```
+http://opencode:<CLAVE>@127.0.0.1:4096/
+```
+La clave va en la URL porque sin ella el servidor responde **401 con cuerpo
+vacío** (por eso se veía en blanco).
+El binario oficial ARM64 pide musl + libstdc++ que Termux no trae; la vía que
+funciona es el tarball `opencode-linux-arm64-musl`.
