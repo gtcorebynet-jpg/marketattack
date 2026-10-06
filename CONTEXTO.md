@@ -265,3 +265,7 @@ sudo bash /tmp/verificar_kit.sh                   # kit: fugas + corrupción
 - `verificacion_final.sh` corre todos los días a las 07:00 y comprueba servicios,
   web, 404 real, las tres claves de opencode, las dos huellas SSH, que la llave
   del celular esté restringida, las 4 vías de respaldo y fugas de secretos.
+- `verificacion_final.sh` **no lleva ninguna clave escrita**: lee la clave
+  antigua de `/etc/marketattack/claves_rotadas.txt`. Por eso se colaba en el kit.
+- `verificar_kit.sh` compara el número de scripts contra lo que hay realmente
+  en `/usr/local/bin` (no un número fijo: si el kit trae 20 de 20, vale).

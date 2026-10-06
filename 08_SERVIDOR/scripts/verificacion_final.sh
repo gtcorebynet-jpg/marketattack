@@ -32,8 +32,13 @@ c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -u "opencode:$CL" http:
 [ "$c" = "200" ] && ok "clave actual -> 200" || mal "clave actual -> $c"
 c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 http://127.0.0.1:4096/)
 [ "$c" = "401" ] && ok "sin clave -> 401" || mal "sin clave -> $c"
-c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -u 'opencode:MA-2026-MarketAtk' http://127.0.0.1:4096/)
-[ "$c" = "401" ] && ok "clave antigua -> 401 (anulada)" || mal "clave antigua -> $c (sigue viva!)"
+ANTIGUA=$(sudo head -1 /etc/marketattack/claves_rotadas.txt 2>/dev/null)
+if [ -n "$ANTIGUA" ]; then
+  c=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 -u "opencode:$ANTIGUA" http://127.0.0.1:4096/)
+  [ "$c" = "401" ] && ok "clave antigua -> 401 (anulada)" || mal "clave antigua -> $c (sigue viva!)"
+else
+  mal "no encuentro la lista de claves rotadas"
+fi
 
 # Llaves autorizadas: comparar HUELLAS reales, no comentarios ni cadenas inventadas.
 HUELLA_PC=SHA256:VbRrdAfJiujLH/aNxcyjKtOBxrcvcJXbMSlqqLpspvo
@@ -88,7 +93,7 @@ TK=$(sudo grep TELEGRAM_TOKEN /etc/marketattack/telegram.conf | cut -d= -f2- | t
 for D in /var/backups/marketattack/completos /root/marketattack-rescate; do
   leaks=0
   sudo grep -rqF -- "$CL" "$D" 2>/dev/null && leaks=$((leaks+1))
-  sudo grep -rqF -- 'MA-2026-MarketAtk' "$D" 2>/dev/null && leaks=$((leaks+1))
+  sudo grep -rqF -- "$ANTIGUA" "$D" 2>/dev/null && leaks=$((leaks+1))
   sudo grep -rqF -- "$TK" "$D" 2>/dev/null && leaks=$((leaks+1))
   sudo grep -rqE 'BEGIN [A-Z ]*PRIVATE KEY' "$D" 2>/dev/null && leaks=$((leaks+1))
   [ "$leaks" -eq 0 ] && ok "$(basename $D): 0 fugas" || mal "$(basename $D): $leaks fugas"
