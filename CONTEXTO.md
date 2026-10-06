@@ -269,3 +269,19 @@ sudo bash /tmp/verificar_kit.sh                   # kit: fugas + corrupción
   antigua de `/etc/marketattack/claves_rotadas.txt`. Por eso se colaba en el kit.
 - `verificar_kit.sh` compara el número de scripts contra lo que hay realmente
   en `/usr/local/bin` (no un número fijo: si el kit trae 20 de 20, vale).
+- `prueba_restauracion.sh` **restaura de verdad** (no dice "debería"): descomprime
+  el kit, abre la DB, y corre `sha256sum -c` sobre el respaldo. Requiere que
+ 乾 el chat se busque a 2 niveles (`chat/conversacion.md`).
+
+### Recuperar de verdad (probado, no supuesto)
+```bash
+# Desde el celu, con el ZIP de Telegram descargado:
+bash recuperar.sh A                    # busca en Descargas
+bash recuperar.sh A /ruta/al/kit.zip   # o le dices cuál es
+
+# Desde la PC con el VPS vivo:
+bash recuperar.sh B
+
+# Desde cualquier parte con GitHub:
+bash recuperar.sh C
+```

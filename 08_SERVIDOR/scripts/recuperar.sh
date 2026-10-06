@@ -15,7 +15,10 @@ case "$1" in
   C|c|github)   VIA="C — GitHub"; ;;
   *) echo "Uso: recuperar.sh [A=telegram | B=vps | C=github]"; exit 1 ;;
 esac
-DEST=${2:-$PWD/marketattack-restaurado}
+# Si el segundo argumento es un .zip, es el kit. Si es una carpeta, es el destino.
+ZIPDADO=""
+if [ -n "${2:-}" ] && [ -f "$2" ]; then ZIPDADO="$2"; DEST="$PWD/marketattack-restaurado"
+else DEST=${2:-$PWD/marketattack-restaurado}; fi
 echo "══════════════════════════════════════"
 echo " RESTAURAR: $VIA"
 echo " Destino:   $DEST"
@@ -24,10 +27,22 @@ mkdir -p "$DEST" && cd "$DEST" || exit 1
 
 case "$1" in
 A|a|telegram)
-  ZIP=$(find "$HOME" /sdcard/Download /storage/emulated/0/Download -maxdepth 3 -name 'KIT_RECUPERACION*.zip' 2>/dev/null | head -1)
-  [ -z "$ZIP" ] && { echo "✗ No encuentro el ZIP. Descárgalo de Telegram y ponlo en Descargas."; exit 1; }
+  ZIP="$ZIPDADO"
+  if [ -z "$ZIP" ]; then
+    ZIP=$(find "$HOME" "$DEST" /sdcard/Download /storage/emulated/0/Download /sdcard \
+             -maxdepth 4 -name 'KIT_RECUPERACION*.zip' 2>/dev/null | head -1)
+  fi
+  if [ -z "$ZIP" ]; then
+    echo "✗ No encuentro el kit."
+    echo "  Descárgalo de Telegram y ponlo en Descargas, o pásalo así:"
+    echo "    bash recuperar.sh A /ruta/al/KIT_RECUPERACION_....zip"
+    exit 1
+  fi
   echo "→ kit: $ZIP"
-  unzip -qo "$ZIP" && K=$(find . -maxdepth 1 -type d -name 'kit_*' | head -1)
+  unzip -qo "$ZIP" -d "$DEST" || { echo "✗ No se pudo descomprimir el ZIP"; exit 1; }
+  cd "$DEST" || exit 1
+  K=$(find . -maxdepth 1 -type d -name 'kit_*' | head -1)
+  [ -z "$K" ] && { echo "✗ El ZIP no tiene la carpeta del kit"; exit 1; }
   echo "→ contenido: $K"
   [ -f "$K/CONTEXTO.md" ] && cp "$K/CONTEXTO.md" . && echo "  ✓ CONTEXTO.md recuperado"
   cp -r "$K/scripts" . 2>/dev/null && echo "  ✓ scripts recuperados"
