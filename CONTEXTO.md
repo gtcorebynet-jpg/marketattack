@@ -285,3 +285,31 @@ bash recuperar.sh B
 # Desde cualquier parte con GitHub:
 bash recuperar.sh C
 ```
+
+## Los 2 pasos que dependen de tu cuenta (ya automatizados)
+
+Ambos están en un comando. Nada más hay que hacer a mano.
+
+### 1) Renovar el token del bot
+1. Telegram → **@BotFather** → `/revoke` → elige `marketattack_alertas_bot`
+2. Te da un token nuevo (copia todo: `123456789:AAH...`)
+3. En el VPS:
+```bash
+ssh -i ~/.ssh/ssh-key-marketattack-20260926.key ubuntu@149.130.190.118
+sudo bash /usr/local/bin/activar_token.sh
+```
+El script valida el token contra Telegram, guarda copia de la config anterior,
+lo instala, reinicia el puente, borra el offset viejo y regenera el kit.
+Si el token está mal pegado, **no cambia nada**.
+
+### 2) Activar el espejo automático en GitHub
+```bash
+sudo bash /usr/local/bin/activar_espejo.sh
+```
+Genera una llave **solo del VPS**, te la muestra para copiar, y cuando la
+pegues en GitHub (Settings → Deploy keys → ☑ Allow write access) publica
+el primer espejo. A partir de ahí sube solo cada día a las 04:00.
+
+### Comprobación
+El informe de las 08:00 ahora reporta las 4 vías y el resultado de
+`verificar_respaldos.sh`. Si algo se rompe, lo ves sin preguntar.

@@ -6,6 +6,7 @@ flock -n 9 || exit 0
 
 IP=149.130.190.118
 T=/usr/local/bin/aviso_telegram.sh
+REPO_MIRROR=/root/marketattack-git
 
 estado(){
   c=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "http://127.0.0.1$u")
@@ -25,9 +26,13 @@ $(for u in "/" "/tienda.html" "/kit.html"; do echo "  $(estado)"; done)
 <b>Tiendas de clientes</b>
   ${N_CLIENTES} publicada(s)
 
-<b>Respaldos</b>
-  $(ls -1 /var/backups/marketattack/*.tar.gz 2>/dev/null | wc -l) diarios
-  $(du -sh /var/backups/marketattack 2>/dev/null | cut -f1) en disco
+<b>Respaldos (4 vías)</b>
+  💾 disco: $(sudo find /var/backups/marketattack/completos -name 'completo_*.tar.gz' | wc -l) completos
+  🪞 espejo: $(sudo find /root/marketattack-rescate -name 'completo_*.tar.gz' | wc -l) completos
+  ✈️ Telegram: $(sudo find /var/backups/marketattack/kits -name '*.zip' | wc -l) kits
+  ☁️ GitHub: $(sudo test -d "$REPO_MIRROR" && echo "espejo local" || echo "se publica al guardar")
+  último: $(sudo ls -t /var/backups/marketattack/completos/completo_*.tar.gz 2>/dev/null | head -1 | xargs -r basename | sed 's/completo_//;s/.tar.gz//' || echo "—")
+$(sudo /usr/local/bin/verificar_respaldos.sh 2>/dev/null | grep -E 'RESULTADO' | sed 's/^/  /')
 
 <b>Recursos</b>
   💾 $(df -h / | awk 'NR==2{print $4" de "$2}')
