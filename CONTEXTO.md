@@ -271,7 +271,7 @@ sudo bash /tmp/verificar_kit.sh                   # kit: fugas + corrupción
   en `/usr/local/bin` (no un número fijo: si el kit trae 20 de 20, vale).
 - `prueba_restauracion.sh` **restaura de verdad** (no dice "debería"): descomprime
   el kit, abre la DB, y corre `sha256sum -c` sobre el respaldo. Requiere que
- 乾 el chat se busque a 2 niveles (`chat/conversacion.md`).
+ porque el chat se busque a 2 niveles (`chat/conversacion.md`).
 
 ### Recuperar de verdad (probado, no supuesto)
 ```bash
