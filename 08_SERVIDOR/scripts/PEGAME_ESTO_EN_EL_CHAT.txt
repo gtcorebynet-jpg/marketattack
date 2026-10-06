@@ -1,0 +1,42 @@
+════════════════════════════════════════════════════
+  PEGA ESTE BLOQUE ENTERO EN EL CHAT DE OPENCODE
+  (en la PC o en el Android). Es el prompt que te devuelve
+  el estado completo del proyecto.
+════════════════════════════════════════════════════
+
+Recuperamos el proyecto MARKETATTACK. Lee estos archivos del kit
+de recuperación y retómame el proyecto desde donde quedó:
+
+1. CONTEXTO.md — la memoria completa del proyecto
+2. chat/conversacion.md — nuestra conversación anterior
+3. estado/ESTADO.txt — cómo estaban los servicios al crear el kit
+
+Empieza respondiendo SOLO esto, en español y en formato de lista:
+
+A) En una frase: ¿en qué quedó exactamente MARKETATTACK?
+
+B) ¿Qué está funcionando ahora mismo?
+   - la web pública (dame el link)
+   - el servicio de crear tiendas de clientes por Telegram
+   - los respaldos automáticos
+
+C) ¿Qué falta hacer? Solo lo pendiente, en orden de prioridad.
+
+D) ¿Hay algún problema técnico abierto? Si sí, dime cuál y cómo
+   lo comprobaste.
+
+E) El comando EXACTO para entrar al servidor por SSH desde mi
+   computadora, con la ruta de mi llave.
+
+Después de eso, continúa tú solo con el paso (C) y avísame antes
+de cambiar algo en el servidor.
+
+REGLAS:
+- Español, simple y corto.
+- No borres ni sobrescribas el kit.
+- Antes de cada cambio: respaldo y verificación.
+- Si no puedes comprobar algo, dilo. No lo inventes.
+
+════════════════════════════════════════════════════
+  FIN DEL BLOQUE
+════════════════════════════════════════════════════

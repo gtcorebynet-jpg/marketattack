@@ -111,6 +111,11 @@ AYUDA = """🤖 <b>MARKETATTACK — comandos</b>
 ⚙️ <b>Operación</b>
 /estado · /respaldos · /publicar · /backup
 
+💻 <b>Comandos al servidor</b>
+/comandos — lista lo que puedo hacer
+/sh <comando> — ejecutar algo (ls, cat, df, tail…)
+/reiniciar <servicio> — reiniciar nginx|opencode|puente-telegram
+
 🔗 <b>Links</b>
 /link · /clientes · /leer (memoria del proyecto) · /nueva
 
@@ -245,6 +250,88 @@ def cmd_cliente(txt):
     return texto
 
 
+
+# ═══════════════════════════════════════════════════════════
+#  EJECUCIÓN DE COMANDOS DESDE TELEGRAM (con lista blanca)
+# ═══════════════════════════════════════════════════════════
+PERMITIDOS = {
+    # solo lectura de archivos y estado
+    "ls", "cat", "head", "tail", "grep", "find", "wc", "du", "df", "free",
+    "uptime", "date", "uname", "whoami", "hostname", "id", "ps", "stat",
+    "echo", "which", "file", "sed", "tree", "realpath", "md5sum",
+    # scripts del proyecto (con o sin ruta)
+    "verificar_tienda.sh", "backup_marketattack.sh", "publicar.sh",
+    "qr_tienda.py", "nuevo_cliente.py", "exportar_sesion.py",
+    # versiones y configuración
+    "nginx", "python3", "node", "opencode", "crontab", "env",
+    # auditoría
+    "verificar_tienda",
+}
+
+# servicios que SÍ se pueden reiniciar desde Telegram
+SERVICIOS = {"nginx", "opencode", "puente-telegram"}
+
+PELIGROSOS = ["rm ", "rm -", "mv ", "cp ", "> ", ">>", "chmod", "chown",
+              "dd ", "mkfs", "shutdown", "reboot", "kill ", "pkill",
+              "apt", "pip", "curl -X", "wget ", "eval", "sudo rm"]
+
+
+def cmd_sh(linea):
+    """Ejecuta un comando permitido y devuelve la salida."""
+    c = linea.strip()
+    if not c:
+        return "Dime el comando. Ejemplo: /sh ls -la /var/www/marketattack"
+
+    bajo = any(p in c for p in PELIGROSOS)
+    if bajo and not c.replace("/usr/local/bin/","").startswith("systemctl restart"):
+        return ("⚠️ <b>Ese comando puede romper el servidor</b> y no lo dejo "
+                "pasar desde Telegram.\n\nLo que sí puedo: reiniciar servicios con\n"
+                "<code>/reiniciar nginx</code>\n<code>/reiniciar opencode</code>"
+                "\n<code>/reiniciar puente-telegram</code>\n\n"
+                "Para lo demás, dímelo y lo hago yo desde la PC.")
+
+    # reinicio de servicios
+    if c.replace("/usr/local/bin/","").startswith("systemctl restart") or c.startswith("/reiniciar"):
+        parts = c.replace("systemctl restart", "").replace("/reiniciar", "").strip().split()
+        if len(parts) != 1 or parts[0] not in SERVICIOS:
+            return f"Servicios permitidos: {', '.join(sorted(SERVICIOS))}"
+        sh(f"systemctl restart {parts[0]}", t=60)
+        time.sleep(5)
+        est = sh(f"systemctl is-active {parts[0]}").strip()
+        return (f"🔄 {parts[0]} reiniciado\n\nEstado: "
+                f"{'✅ ' + est if est == 'active' else '❌ ' + est}")
+
+    # lista blanca: se compara el nombre del programa, con o sin ruta
+    toks = c.split()
+    base = os.path.basename(toks[0]) if toks else ""
+    if base not in PERMITIDOS and c not in PERMITIDOS:
+        return ("🔒 Ese comando no está en la lista.\n\n"
+                f"<b>Permitidos:</b> {', '.join(sorted(PERMITIDOS)[:14])}…\n\n"
+                "Lista completa: /comandos")
+
+    salida = sh(c, t=120)
+    if not salida.strip():
+        salida = "(sin salida: el comando se ejecutó sin imprimir nada)"
+    if len(salida) > 3400:
+        salida = salida[:3400] + "\n… (cortado)"
+    return f"💻 <code>{c[:120]}</code>\n\n<pre>{salida}</pre>"
+
+
+def cmd_comandos():
+    return ("🔒 <b>Comandos que puedo ejecutar</b>\n\n"
+            f"<b>Programas permitidos:</b> {', '.join(sorted(PERMITIDOS))}\n\n\n\n<b>Ver archivos:</b>\n"
+            "<code>/sh ls -la /var/www/marketattack</code>\n"
+            "<code>/sh tail -20 /var/log/opencode.log</code>\n"
+            "<code>/sh cat CONTEXTO.md</code>\n\n<b>Estado del sistema:</b>\n"
+            "<code>/sh df -h /</code>\n<code>/sh free -m</code>\n"
+            "<code>/sh uptime</code>\n\n<b>Auditar tiendas:</b>\n"
+            "<code>/sh verificar_tienda.sh todas</code>\n\n"
+            "<b>Reiniciar servicios:</b>\n"
+            "<code>/reiniciar nginx</code>\n"
+            "<code>/reiniciar opencode</code>\n"
+            "<code>/reiniciar puente-telegram</code>\n\n"
+            "⚠️ Lo que puedaromper el servidor queda bloqueado a propósito.")
+
 def procesar(txt):
     if txt.startswith("/"):
         c, _, arg = txt.partition(" ")
@@ -255,6 +342,12 @@ def procesar(txt):
             return cmd_cliente(txt) if arg.strip() else FORMATO
         if c == "/estado":
             return cmd_estado()
+        if c == "/comandos":
+            return cmd_comandos()
+        if c == "/sh":
+            return cmd_sh(arg)
+        if c == "/reiniciar":
+            return cmd_sh("systemctl restart " + arg.strip())
         if c == "/clientes":
             return cmd_clientes()
         if c == "/respaldos":

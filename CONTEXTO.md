@@ -168,3 +168,88 @@ La clave va en la URL porque sin ella el servidor responde **401 con cuerpo
 vacío** (por eso se veía en blanco).
 El binario oficial ARM64 pide musl + libstdc++ que Termux no trae; la vía que
 funciona es el tarball `opencode-linux-arm64-musl`.
+
+---
+
+## 2026-10-06 — Comandos por Telegram + respaldos redundantes
+
+### Rotación de seguridad (hecho)
+- Llave SSH de la PC activa: `ssh-key-marketattack-20260926.key`
+  (huella `SHA256:VbRrdAfJiujLH/aNxcyjKtOBxrcvcJXbMSlqqLpspvo`).
+  La llave antigua se quitó de `authorized_keys`.
+- Llave del celular (`telefono`) restringida al túnel del puerto 4096:
+  `SHA256:9lI9c4iGJDIgw2av5ud6a7azsVBUgwA4XhzdlVgCcnw`.
+- **Clave de opencode rotada.** La antigua ya no sirve (401).
+  Se guarda solo en el servidor: `sudo cat /root/CLAVE_OPENCODE.txt` (root, 600).
+  **Nunca** escribirla en este archivo, en Telegram ni en GitHub.
+- Las claves ya usadas se listan en `/etc/marketattack/claves_rotadas.txt`
+  (600) y el exportador del chat las borra automáticamente.
+
+### Comandos desde Telegram (nuevo)
+El puente responde a:
+- `/comandos` — lista lo que puede hacer.
+- `/sh <comando>` — ejecuta y devuelve la salida. Lista blanca:
+  `ls cat head tail grep find wc du df free uptime date uname whoami hostname
+  id ps stat echo which file sed tree realpath md5sum verificar_tienda.sh
+  backup_marketattack.sh publicar.sh qr_tienda.py nuevo_cliente.py
+  exportar_sesion.py nginx python3 node opencode crontab env`
+- `/reiniciar nginx|opencode|puente-telegram` — solo esos tres.
+
+Lo destructivo está **bloqueado a propósito**: `rm`, `chmod`, `dd`, `wget`,
+`kill`, `apt`, `curl -X`, `shutdown`, etc. se rechazan con un mensaje que
+explica qué sí se puede hacer. Hay 22 pruebas automáticas que cubren
+estos casos.
+
+### Respaldo en 4 vías (nuevo)
+| Vía | Qué guarda | Dónde | Cuándo |
+|-----|-----------|-------|--------|
+| A — VPS disco | chat + web + scripts + config saneada | `/var/backups/marketattack/completos/` | 02:30 diario, 14 días |
+| B — VPS espejo | copia idéntica de A | `/root/marketattack-rescate/` | 02:30 diario, 14 días |
+| C — Telegram | kit con contexto + chat + scripts | el chat, 00:00 diario | 00:00 diario, 30 kits |
+| D — GitHub | código, contexto, config saneada | `gtcorebynet-jpg/marketattack` | al guardar cambios |
+
+- Cada respaldo lleva `SHA256SUMS`: si algo se corrompe, se nota.
+- `verificar_respaldos.sh` revisa **las dos vías** y comprueba que coincidan.
+  Probado con dos fallos reales: archivo truncado y archivo manipulado.
+  Ambos detectados.
+- La copia del chat se hace con `sqlite3.backup()` (copia consistente
+  aunque la base esté en uso), no con `cp`.
+
+### Restaurar desde cualquier sitio
+`recuperar.sh` permite elegir de dónde:
+- `recuperar.sh A` — desde el ZIP de Telegram (el celu).
+- `recuperar.sh B` — desde el VPS.
+- `recuperar.sh C` — clonando GitHub.
+
+### Bugs corregidos en el camino
+1. **`exportar_sesion.py` corrompía el chat.** El patrón `re.compile(r"[CLAVE]")`
+   es una *clase de caracteres* (C, L, A, V, E), no el texto literal: por eso
+   `WDC` salía como `WD[CLAVE SERVIDOR]` y `el kit` como `[CLAVE SERVIDOR]l kit`.
+   7977 sustituciones en el kit. Corregido con `re.escape()`.
+   La auditoría de secretos decía "0 fugas" y aun así el texto estaba roto:
+   **una auditoría de fugas no detecta corrupción**, hace falta mirar el texto.
+2. **El kit no llevaba los scripts del servidor.** La ruta era
+   `$W/../usr/local/bin/*.sh`, que no existe. Ahora usa `sudo cp`.
+3. **`RESTAURAR.sh` imprimía literalmente `$IP`** por un `<<'PASO'` entrecomillado.
+4. **La clave antigua se colaba** en el kit al volver el detector dinámico.
+   Ahora el exportador lee la clave actual **y** `/etc/marketattack/claves_rotadas.txt`.
+5. **`SERVICIOS` se había borrado** al reescribir la lista blanca; lo cazaron
+   las pruebas (2 fallos) antes de desplegar.
+6. **El verificador de tiendas no comprobaba el nombre comercial**, solo el slug.
+
+### Cómo verificarlo todo
+```bash
+sudo bash /usr/local/bin/verificar_respaldos.sh   # integridad de las 2 vías
+sudo bash /tmp/verificar_kit.sh                   # kit: fugas + corrupción
+```
+
+### Pendiente del usuario (2 cosas, 2 minutos)
+1. **Rotar el token del bot** en `@BotFather`: `/revoke` → elegir el bot.
+2. **Activar el espejo automático del VPS en GitHub** (para no depender de la PC):
+   ```bash
+   sudo ssh-keygen -t ed25519 -C "vps-marketattack" -f /root/.ssh/id_ed25519
+   sudo cat /root/.ssh/id_ed25519.pub
+   ```
+   Copiar esa llave en GitHub → repo → Settings → Deploy keys →
+   Add deploy key → ☑ **Allow write access**.
+   A partir de ahí `publicar_github.sh` sube solo, cada día a las 04:00.
