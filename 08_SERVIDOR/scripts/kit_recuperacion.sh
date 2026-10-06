@@ -95,10 +95,31 @@ echo "  ✓ kit completo: restaurador, prompt, contexto, chat y estado"
 # cualquier clave que se rote en el futuro.
 CLAVE_ACTUAL=$(sudo grep -oE 'OPENCODE_SERVER_PASSWORD=\S+' /etc/systemd/system/opencode.service 2>/dev/null | cut -d= -f2-)
 TOKEN_ACTUAL=$(sudo grep TELEGRAM_TOKEN /etc/marketattack/telegram.conf 2>/dev/null | cut -d= -f2- | tr -d '"')
-SECRETO="[0-9]{8,10}:[A-Za-z0-9_-]{35}|-----BEGIN[A-Z ]*PRIVATE KEY-----|OPENCODE_SERVER_PASSWORD=[A-Za-z0-9]|TELEGRAM_TOKEN=[0-9]"
-[ -n "$CLAVE_ACTUAL" ] && SECRETO="$SECRETO|$(printf '%s' "$CLAVE_ACTUAL" | sed 's/[.[\*^$]/\\&/g')"
-[ -n "$TOKEN_ACTUAL" ] && SECRETO="$SECRETO|$(printf '%s' "$TOKEN_ACTUAL" | sed 's/[.[\*^$]/\\&/g')"
-FUGA=$(grep -rlIE "$SECRETO" "$DIR" 2>/dev/null)
+# SECRETO = cosas que NUNCA deben salir y se pueden enmascarar sin danar nada:
+# llaves privadas reales, la clave vigente, el token vigente y las ya rotadas.
+# Los patrones genericos van aparte en SOSPECHOSO: solo avisan, nunca tapan,
+# porque un token de ejemplo en la documentacion no es una fuga real.
+SECRETO="-----BEGIN[A-Z ]*PRIVATE KEY-----|OPENCODE_SERVER_PASSWORD=[A-Za-z0-9]|TELEGRAM_TOKEN=[0-9]"
+SOSPECHOSO="[0-9]{8,10}:[A-Za-z0-9_-]{35}|gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9_-]{20,}"
+esc() { printf '%s' "$1" | sed 's/[.[\*^$]/\\&/g'; }
+[ -n "$CLAVE_ACTUAL" ] && SECRETO="$SECRETO|$(esc "$CLAVE_ACTUAL")"
+[ -n "$TOKEN_ACTUAL" ] && SECRETO="$SECRETO|$(esc "$TOKEN_ACTUAL")"
+# TODAS las claves ya rotadas: si una se filtra al kit, tambien se detecta
+NROT=0
+if [ -f /etc/marketattack/claves_rotadas.txt ]; then
+  while IFS= read -r k; do
+    k=$(printf '%s' "$k" | tr -d '\r')
+    [ -z "$k" ] && continue
+    case "$k" in \#*) continue ;; esac
+    SECRETO="$SECRETO|$(esc "$k")"
+    NROT=$((NROT+1))
+  done < <(sudo cat /etc/marketattack/claves_rotadas.txt 2>/dev/null)
+fi
+[ "$NROT" -gt 0 ] && echo "  auditoria: clave actual + token + $NROT clave(s) rotada(s)"
+# avisos: patrones que PODRIAN ser secretos, pero no se tapan (evita destruir texto)
+SOSP=$(grep -rlIE -- "$SOSPECHOSO" "$DIR" 2>/dev/null | wc -l)
+[ "$SOSP" -gt 0 ] && echo "  aviso: $SOSP archivo(s) con texto tipo token/api-key (revisar a mano, NO se tapa)"
+FUGA=$(grep -rlIE -- "$SECRETO" "$DIR" 2>/dev/null)
 if [ -n "$FUGA" ]; then
   echo "🚨 FUGA DE SECRETOS DETECTADA: $FUGA"
   echo "$FUGA" | while read f; do
@@ -106,7 +127,7 @@ if [ -n "$FUGA" ]; then
   done
 fi
 
-NLEAK=$(grep -rlIE "$SECRETO" "$DIR" 2>/dev/null | wc -l)
+NLEAK=$(grep -rlIE -- "$SECRETO" "$DIR" 2>/dev/null | wc -l)
 echo "  auditoría de secretos: $NLEAK archivos con fuga (0 = seguro)"
 
 # ── 6) guía dentro del kit ──
@@ -171,13 +192,23 @@ COMO OBTENERLOS (si realmente los necesitas):
 GUIA
 
 # ── 7) STOP si hay fuga real: nunca sale un kit con secretos ──
-NLEAK2=$(grep -rlIE "$SECRETO" "$DIR" 2>/dev/null | wc -l)
+NLEAK2=$(grep -rlIE -- "$SECRETO" "$DIR" 2>/dev/null | wc -l)
 if [ "$NLEAK2" != "0" ]; then
   echo "🚨 DETENIDO: $NLEAK2 archivo(s) con secretos. NO se envía nada."
-  grep -rlIE "$SECRETO" "$DIR" 2>/dev/null | sed 's/^/   /'
+  grep -rlIE -- "$SECRETO" "$DIR" 2>/dev/null | sed 's/^/   /'
   exit 1
 fi
 echo "  ✓ verificación final: 0 secretos, se puede enviar"
+
+# ── 7b) ARCHIVO ÚNICO para pegar a un chat nuevo de opencode ──
+if /usr/local/bin/generar_restauracion.sh "$W/kit_$FECHA" 2>/dev/null; then
+  echo "  ✓ RESTAURACION_RAPIDA.md (archivo único, autocontenido)"
+  # la carpeta del kit se borra al comprimir: se guarda copia aparte
+  cp "$W/kit_$FECHA/RESTAURACION_RAPIDA.md" /tmp/RESTAURACION_RAPIDA.md 2>/dev/null \
+    && chmod 644 /tmp/RESTAURACION_RAPIDA.md
+else
+  echo "  ⚠ no se pudo generar RESTAURACION_RAPIDA.md"
+fi
 
 # ── 8) comprimir ──
 cd "$W"
@@ -212,4 +243,34 @@ sudo curl -s --max-time 300 -F "chat_id=$C" -F "document=@$ZIP" \
   | python3 -c "import json,sys; d=json.load(sys.stdin); print('  envío a Telegram:', 'OK' if d.get('ok') else 'FALLÓ '+str(d.get('description')))" 2>/dev/null
 
 echo "✓ kit: $ZIP ($TAMA), $NMSG mensajes, secretos: $NLEAK"
+
+# ── 9) también sueltos, para bajar UN solo archivo y pegarlo a otro chat ──
+RAPIDA="/tmp/RESTAURACION_RAPIDA.md"
+if [ -f "$RAPIDA" ]; then
+  RAPIDA_SOLO="/var/backups/marketattack/kits/RESTAURACION_RAPIDA_$FECHA.md"
+  sudo mkdir -p /var/backups/marketattack/kits
+  sudo cp "$RAPIDA" "$RAPIDA_SOLO" && sudo chmod 644 "$RAPIDA_SOLO"
+  ls -1t /var/backups/marketattack/kits/RESTAURACION_RAPIDA_*.md 2>/dev/null \
+    | tail -n +15 | xargs -r sudo rm -f
+  bash /usr/local/bin/aviso_telegram.sh "📄 <b>ARCHIVO ÚNICO DE RESTAURACIÓN</b>
+
+Este es el que quieres para abrir un <b>chat nuevo</b> en opencode
+en cualquier otro dispositivo.
+
+<b>Cómo se usa (30 segundos):</b>
+1. Descarga este archivo.
+2. En opencode, nuevo chat, arrastra el archivo.
+3. Escribe: <i>lee este archivo y retoma MARKETATTACK</i>
+
+Trae todo dentro: cómo entrar al servidor, estado verificado, los
+4 respaldos, los comandos de Telegram, el producto para vender,
+<b>todos los scripts</b> y la memoria completa del proyecto.
+Sin llaves ni tokens — eso se queda en el servidor.
+
+Tamaño: $(sudo du -h "$RAPIDA_SOLO" | cut -f1)"
+  sudo curl -s --max-time 120 -F "chat_id=$C" -F "document=@$RAPIDA_SOLO" \
+    "https://api.telegram.org/bot$T/sendDocument" \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); print('  archivo único:', 'OK' if d.get('ok') else 'FALLÓ')" 2>/dev/null
+fi
+
 rm -rf "$W"

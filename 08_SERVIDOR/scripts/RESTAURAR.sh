@@ -25,8 +25,25 @@ for f in CONTEXTO.md chat/conversacion.md estado/ESTADO.txt; do
     printf "   ❌ %-28s falta\n" "$f"
   fi
 done
-N=$(grep -c '^## ' "$DIR/chat/conversacion.md" 2>/dev/null || echo 0)
+# El numero real de mensajes vive en el JSON (lista 'mensajes').
+# Contar lineas '^## ' del markdown daba un numero falso: los encabezados de
+# contenido tambien empiezan por '## ' y inflaban la cuenta.
+N=""
+if [ -f "$DIR/chat/conversacion.json" ] && command -v python3 >/dev/null 2>&1; then
+  # el JSON trae 'mensajes' como numero y 'conversacion' como lista: se toman
+  # los dos y se quedan con el mayor, para que nunca sean 0 si el formato cambia
+  N=$(python3 -c "
+import json
+d=json.load(open('$DIR/chat/conversacion.json'))
+m=d.get('mensajes'); c=d.get('conversacion')
+n=[x for x in (m if isinstance(m,int) else 0, len(c) if isinstance(c,list) else 0) if x]
+print(max(n) if n else '')
+" 2>/dev/null)
+fi
+[ -z "$N" ] && N=$(grep -c '^## ' "$DIR/chat/conversacion.md" 2>/dev/null || echo 0)
 echo "   📋 $N mensajes guardados en la conversación"
+[ -n "$(ls -A "$DIR/chat/conversacion.json" 2>/dev/null)" ] && [ -z "$N" ] && \
+  echo "   ⚠ no se pudo leer el JSON; el número puede ser aproximado"
 echo ""
 
 # ── 2) mostrar el estado como estaba ──

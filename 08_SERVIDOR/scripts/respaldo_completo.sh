@@ -80,12 +80,29 @@ for D in "$BASE" "$ESPEJO"; do
   sudo find "$D" -name 'completo_*.tar.gz' -mtime +$DIAS -delete 2>/dev/null
 done
 
-# 9) verificación: el archivo que acabamos de escribir se puede leer y validar
-if sudo tar -tzf "$BASE/completo_$TS.tar.gz" >/dev/null 2>&1 && sudo sha256sum -c --quiet "$BASE/completo_$TS.tar.gz" >/dev/null 2>&1; then
-  log "compresión: verificada"
+# 9) verificación REAL: se extrae el tar aparte y se pasa sha256sum -c sobre el
+#    SHA256SUMS de DENTRO. Antes se validaba el propio .tar.gz como si fuera una
+#    lista de sumas: siempre fallaba y caía al mensaje de "compresión verificada"
+#    sin haber comprobado nada. El respaldo se daba por bueno sin probarlo.
+CHK=$(mktemp -d)
+NSHA=$(wc -l < "$W/SHA256SUMS" 2>/dev/null || echo 0)
+# se extrae el tar COMPLETO: sha256sum -c necesita los archivos, no solo el
+# listado. Extrayendo solo SHA256SUMS daba error falso en todos los archivos.
+if sudo tar -xzf "$BASE/completo_$TS.tar.gz" -C "$CHK" 2>/dev/null; then
+  if sudo bash -c "cd '$CHK' && sha256sum -c --quiet ./SHA256SUMS" >/dev/null 2>&1; then
+    log "integridad: $NSHA archivos verificados dentro del tar"
+  else
+    log "ERROR: hay archivos que NO coinciden con su SHA256 dentro del respaldo"
+    MAL=1
+  fi
 else
-  sudo tar -tzf "$BASE/completo_$TS.tar.gz" >/dev/null 2>&1 && log "compresión: verificada" || log "ERROR: el archivo no se puede leer"
+  log "ERROR: el tar no se pudo extraer, no se puede validar la integridad"
+  MAL=1
 fi
+sudo tar -tzf "$BASE/completo_$TS.tar.gz" >/dev/null 2>&1 \
+  && log "compresión: verificada" \
+  || { log "ERROR: el archivo no se puede leer"; MAL=1; }
+sudo rm -rf "$CHK"
 
 echo "   vía A: $BASE  ($(sudo ls -1 $BASE | wc -l) copias)"
 echo "   vía B: $ESPEJO  ($(sudo ls -1 $ESPEJO | wc -l) copias)"

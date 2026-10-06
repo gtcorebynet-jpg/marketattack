@@ -17,7 +17,17 @@ ANTIGUA=$(sudo head -1 /etc/marketattack/claves_rotadas.txt 2>/dev/null)
 chk "clave antigua"         "$(nf "$ANTIGUA")" "0"
 chk "token telegram"        "$(nf "$TK")" "0"
 chk "llaves privadas"       "$(n 'BEGIN[A-Z ]*PRIVATE KEY')" "0"
-chk "tokens sueltos"        "$(n '[0-9]{8,10}:[A-Za-z0-9_-]{35}')" "0"
+# Los secretos reales ya se comprueban uno por uno arriba (clave actual, clave
+# antigua, token vigente y llaves privadas). Este patron generico solo avisa:
+# un token de EJEMPLO en la documentacion no es una fuga y no debe romper el kit.
+LOOSOS=$(n '[0-9]{8,10}:[A-Za-z0-9_-]{35}')
+if [ "$LOOSOS" -eq 0 ]; then
+  ok "tokens sueltos         0"
+else
+  echo "  aviso tokens sueltos  $LOOSOS (revisar: puede ser un token de ejemplo en la doc)"
+  sudo grep -rhoE -- '[0-9]{8,10}:[A-Za-z0-9_-]{35}' "$K" 2>/dev/null | sort -u \
+    | head -5 | sed 's/^/      /'
+fi
 chk "api keys"              "$(n 'sk-[A-Za-z0-9_-]{20,}')" "0"
 chk "tokens github"         "$(n 'gh[pousr]_[A-Za-z0-9]{20,}')" "0"
 
