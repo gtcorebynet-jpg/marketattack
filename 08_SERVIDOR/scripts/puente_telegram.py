@@ -6,6 +6,7 @@
 ╚═══════════════════════════════════════════════════════════╝
 """
 import json, os, re, subprocess, sys, time, base64
+import datetime, glob, html
 import urllib.request, urllib.parse
 
 CFG = "/etc/marketattack/telegram.conf"
@@ -104,6 +105,15 @@ def sesion():
 
 
 AYUDA = """🤖 <b>MARKETATTACK — comandos</b>
+
+🟠 <b>Vender</b>
+/producto — catálogo completo de MARKETATTACK
+/oferta — mensaje corto para mandar a un cliente
+/precios — tabla de precios
+
+📥 <b>Prospectos</b>
+/prospecto — guardar uno nuevo
+/prospectos — ver la lista
 
 🆕 <b>Clientes</b>
 /cliente — crear tienda para un cliente (te explico abajo)
@@ -332,6 +342,51 @@ def cmd_comandos():
             "<code>/reiniciar puente-telegram</code>\n\n"
             "⚠️ Lo que puedaromper el servidor queda bloqueado a propósito.")
 
+DIR_PROSPECTOS = "/var/lib/marketattack/prospectos"
+
+
+def nuevo_prospecto(nombre, rubro, ciudad, contacto, nota=""):
+    """Guarda un prospecto en la lista de busqueda."""
+    os.makedirs(DIR_PROSPECTOS, exist_ok=True)
+    reg = re.sub(r"[^a-z0-9]+", "-", (nombre or "").lower()).strip("-") or "sin-nombre"
+    f = f"{DIR_PROSPECTOS}/{reg}.txt"
+    fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    with open(f, "a") as fh:
+        fh.write(f"\n[{fecha}] {nombre} | {rubro} | {ciudad} | {contacto}"
+                 + (f" | {nota}" if nota else "") + "\n")
+    return f
+
+
+def cmd_prospecto(arg):
+    """Guarda prospectos: /prospecto Nombre | Rubro | Ciudad | contacto | nota"""
+    if not arg.strip():
+        return ("📥 <b>GUARDAR PROSPECTO</b>\n\n"
+                "<code>/prospecto Nombre | Rubro | Ciudad | contacto | nota</code>\n\n"
+                "<b>Ejemplo</b>\n"
+                "<code>/prospecto Panadería La Espiga | Panadería | Soacha | 573001112233</code>\n\n"
+                "Después usa <code>/prospectos</code> para ver la lista.")
+    p = [x.strip() for x in arg.split("|")]
+    while len(p) < 4:
+        p.append("")
+    nuevo_prospecto(p[0], p[1], p[2], p[3], " ".join(p[4:]))
+    return (f"✅ Prospecto <b>{html.escape(p[0] or 'sin nombre')}</b> guardado.\n"
+            f"📋 Ver todos: <code>/prospectos</code>")
+
+
+def cmd_prospectos():
+    if not os.path.isdir(DIR_PROSPECTOS):
+        return "📋 Aún no hay prospectos. Agrega con <code>/prospecto</code>"
+    fs = sorted(glob.glob(f"{DIR_PROSPECTOS}/*.txt"))
+    if not fs:
+        return "📋 Aún no hay prospectos. Agrega con <code>/prospecto</code>"
+    out = [f"📋 <b>PROSPECTOS ({len(fs)})</b>\n"]
+    for f in fs:
+        line = open(f).read().strip().split("\n")[-1]
+        line = line[1:].strip() if line.startswith("[") else line
+        out.append(f"• {html.escape(line)}")
+    return "\n".join(out)[:3500]
+
+
 def procesar(txt):
     if txt.startswith("/"):
         c, _, arg = txt.partition(" ")
@@ -344,6 +399,16 @@ def procesar(txt):
             return cmd_estado()
         if c == "/comandos":
             return cmd_comandos()
+        if c in ("/producto", "/catalogo"):
+            return sh("bash -c 'source /usr/local/bin/catalogo.sh; catalogo'")
+        if c == "/oferta":
+            return sh("bash -c 'source /usr/local/bin/catalogo.sh; oferta'")
+        if c == "/precios":
+            return sh("bash -c 'source /usr/local/bin/catalogo.sh; precios'")
+        if c == "/prospecto":
+            return cmd_prospecto(arg)
+        if c == "/prospectos":
+            return cmd_prospectos()
         if c == "/sh":
             return cmd_sh(arg)
         if c == "/reiniciar":

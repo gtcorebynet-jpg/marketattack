@@ -316,3 +316,30 @@ El informe de las 08:00 ahora reporta las 4 vías y el resultado de
 - El verificador comprueba el cron **por nombre de script**, no por cantidad.
   Antes contaba reglas y se le pasó por alto que faltaba la del respaldo web.
   Probado: quitando una regla, avisa exactamente cuál falta.
+
+---
+
+## 2026-10-06 · Venta y captación desde Telegram
+
+### Comandos nuevos de venta (Listos para usar)
+| Comando | Qué hace |
+|---|---|
+| `/producto` | Catálogo completo de MARKETATTACK para mandar a un cliente |
+| `/oferta` | Mensaje corto y listo para copiar y pegar en WhatsApp |
+| `/precios` | Tabla de precios (Esencial 450k / Profesional 850k / Escala 1.4M COP) |
+| `/prospecto Nombre \| Rubro \| Ciudad \| contacto \| nota` | Guarda un prospecto |
+| `/prospectos` | Ver la lista de prospectos |
+
+Los prospectos se guardan en `/var/lib/marketattack/prospectos/*.txt`,
+uno por archivo, con fecha y hora de cada alta.
+
+### El agente del Telegram tiene permisos reales
+Verificado que puede **leer, escribir y usar internet** desde el proyecto
+`/home/personalamd/Documentos/Default Project`. Se le copió el proyecto
+completo de la PC (43 archivos) para que trabaje aunque la PC esté apagada.
+
+Prueba: le pedí crear un archivo y lo creó de verdad.
+
+### Pruebas
+- Suite del puente ampliada a **27 pruebas** (16 válidas + 11 bloqueadas): todas OK.
+- `pruebas_puente.py` quedó instalado en `/usr/local/bin/` para poder repetirlas.
