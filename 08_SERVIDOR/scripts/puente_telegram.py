@@ -383,7 +383,14 @@ def procesar(txt):
 def main():
     print("PUENTE ACTIVO")
     sesion()
-    off = 0
+    # ── El offset se guarda en disco. Sin esto, cada reinicio del servicio
+    #    vuelve a leer TODO el historial y responde mensajes antiguos otra vez.
+    OFICIO = "/home/ubuntu/.marketattack_offset"
+    try:
+        off = int(open(OFICIO).read().strip())
+        print("OFFSET GUARDADO:", off)
+    except Exception:
+        off = 0
     while True:
         try:
             with urllib.request.urlopen(f"{BASE}/getUpdates?timeout=25&offset={off}", timeout=90) as r:
@@ -393,6 +400,11 @@ def main():
             continue
         for u in d.get("result", []):
             off = u["update_id"] + 1
+            try:
+                with open(OFICIO, "w") as f:
+                    f.write(str(off))
+            except OSError:
+                pass
             msg = u.get("message") or {}
             chat = (msg.get("chat") or {}).get("id")
             t = (msg.get("text") or "").strip()

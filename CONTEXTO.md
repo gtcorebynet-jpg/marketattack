@@ -253,3 +253,15 @@ sudo bash /tmp/verificar_kit.sh                   # kit: fugas + corrupción
    Copiar esa llave en GitHub → repo → Settings → Deploy keys →
    Add deploy key → ☑ **Allow write access**.
    A partir de ahí `publicar_github.sh` sube solo, cada día a las 04:00.
+
+### Más correcciones (2026-10-06, tarde)
+- **El puente reprocesaba el historial al reiniciar.** `off = 0` estaba fijo en
+  el código: cada reinicio leía todos los mensajes antiguos y volvía a
+  responderlos. Ahora el offset se lee y se guarda en
+  `/home/ubuntu/.marketattack_offset`.
+- `guardar_offset.py` ancla el offset a mano (`python3 /usr/local/bin/guardar_offset.py`).
+- La verificación final compara **huellas SSH reales**, no comentarios de las
+  llaves: la primera versión daba un falso "llave antigua presente".
+- `verificacion_final.sh` corre todos los días a las 07:00 y comprueba servicios,
+  web, 404 real, las tres claves de opencode, las dos huellas SSH, que la llave
+  del celular esté restringida, las 4 vías de respaldo y fugas de secretos.
