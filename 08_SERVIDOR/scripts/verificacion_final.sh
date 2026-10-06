@@ -101,8 +101,17 @@ done
 
 echo ""
 echo "── CRON ──"
-n=$(sudo crontab -l | grep -cE 'respaldo_completo|publicar_github|verificar_respaldos|kit_recuperacion|informe_diario|watchdog_marketattack|backup_marketattack')
-[ "$n" -ge 7 ] && ok "$n reglas activas" || mal "solo $n reglas"
+CRON=$(sudo crontab -l)
+faltan=""
+for t in watchdog_marketattack backup_marketattack kit_recuperacion informe_diario \
+         respaldo_completo publicar_github verificar_respaldos verificacion_final; do
+  echo "$CRON" | grep -q "$t" || faltan="$faltan $t"
+done
+if [ -z "$faltan" ]; then
+  ok "las 8 reglas de cron estan activas"
+else
+  mal "faltan reglas de cron:$faltan"
+fi
 
 echo ""
 echo "── DISCOS ──"

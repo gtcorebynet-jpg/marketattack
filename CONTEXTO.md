@@ -313,3 +313,6 @@ el primer espejo. A partir de ahí sube solo cada día a las 04:00.
 ### Comprobación
 El informe de las 08:00 ahora reporta las 4 vías y el resultado de
 `verificar_respaldos.sh`. Si algo se rompe, lo ves sin preguntar.
+- El verificador comprueba el cron **por nombre de script**, no por cantidad.
+  Antes contaba reglas y se le pasó por alto que faltaba la del respaldo web.
+  Probado: quitando una regla, avisa exactamente cuál falta.
