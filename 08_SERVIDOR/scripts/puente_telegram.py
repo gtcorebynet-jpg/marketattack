@@ -387,6 +387,105 @@ def cmd_prospectos():
     return "\n".join(out)[:3500]
 
 
+PALABRAS_NEGOCIO = ("panader", "restaurante", "taller", "salon", "salón", "clinica", "clínica",
+                   "tienda", "cafe", "café", "peluqueria", "peluquería", "inmobiliaria",
+                   "dental", "veterinaria", "ferreteria", "carniceria", "carnicería",
+                   "pizzeria", "pizzería", "don_pepe", "la_", "el_", "mis_", "don",
+                   "cliente", "prospecto", "negocio", "empresa", "lider", "dueño",
+                   "dueño", "contacto", "whatsapp", "telefono", "teléfono")
+
+DIR_PLANOS = "/var/lib/marketattack/prospectos"
+
+
+def _norm_wap(raw):
+    """Deja un numero colombiano en 57XXXXXXXXX."""
+    d = re.sub(r"\D", "", raw)
+    if d.startswith("57") and len(d) == 12:
+        return d
+    if len(d) == 10 and d.startswith("3"):
+        return "57" + d
+    return d if 10 <= len(d) <= 13 else None
+
+
+def _nombre_probable(txt):
+    """Busca un nombre de negocio: usa lo que va ANTES del telefono.
+
+    Si no, "Panadería La Espiga 3001234567 Soacha" creaba un archivo con
+    "Soacha" dentro del nombre y el mismo negocio acababa en dos archivos.
+    """
+    for l in txt.splitlines():
+        l = l.strip()
+        if not l or "@" in l or "http" in l:
+            continue
+        l = re.sub(r"[+()]", " ", l)
+        # los artículos se quitan SOLO al principio: "La Espiga" debe quedar
+        # "La Espiga", no "Espiga". A mitad de frase si se limpian.
+        l = re.sub(r"^(?:el|la|los|las|un|una|de|del)\s+", "", l, flags=re.I)
+        l = re.sub(r"\b(?:para|con|que|nuevo|nueva)\b", " ", l, flags=re.I)
+        # "La" mide 2 letras: con len(p) > 2 se perdia de "Panadería La Espiga"
+        palabras = [p for p in re.split(r"[\s,;]+", l) if len(p) > 1]
+        if not palabras:
+            continue
+        cap = [p for p in palabras if p[0].isupper()]
+        if not cap:
+            continue
+        cand = " ".join(cap[:3]).strip(" .,-")
+        if len(cand) >= 4:
+            return cand
+    return None
+
+
+def intento_prospecto(txt):
+    """Si el texto trae un telefono y parece un cliente, lo registra solo.
+
+    Devuelve None si no es un alta, para que el texto siga al agente normal.
+    """
+    if len(txt) > 400:
+        return None
+    if re.match(r"^\s*/", txt):
+        return None
+    # movil colombiano: 3 seguido de 9 digitos, con separadores donde sea.
+    # Los grupos importan poco: escriben "+57 310 222 3344" o "310-222-3344"
+    # igual que "3102223344". Los patrones fijos de 3-3-3 fallaban con la
+    # primera forma, asi que se cuentan digitos, no separadores.
+    m = re.search(r"(?:\+?57[\s -]*)?3(?:[\s -]*\d){9}", txt)
+    if not m:
+        return None
+    wap = _norm_wap(m.group(0))
+    if not wap:
+        return None
+    bajo = txt.lower()
+    if not any(k in bajo for k in PALABRAS_NEGOCIO):
+        return None
+    antes = txt[:m.start()].strip(" -:,")
+    nombre = _nombre_probable(antes) or _nombre_probable(txt) or "Cliente sin nombre"
+    # palabras de relleno SOLO al principio: si no, "Panadería La Espiga"
+    # se quedaba sin "La" y el negocio quedaba mal nombrado
+    nombre = re.sub(r"^(?:tengo\s+)?(?:un|una|el|la\s+)?(?:cliente|prospecto|negocio|empresa)\s+", "", nombre, flags=re.I)
+    nombre = re.sub(r"^(?:un|una|el|la)\s+", "", nombre, flags=re.I)
+    nombre = re.sub(r"^(?:nuevo|nueva|tengo)\s+", "", nombre, flags=re.I)
+    nombre = re.sub(r"\s+", " ", nombre).strip(" .,-") or "Cliente sin nombre"
+    rubro = next((k.strip() for k in PALABRAS_NEGOCIO if k in bajo and k not in
+                  ("cliente", "prospecto", "negocio", "empresa", "contacto", "whatsapp",
+                   "telefono", "teléfono", "lider", "dueño", "dueño")), "por definir")
+    os.makedirs(DIR_PLANOS, exist_ok=True)
+    reg = re.sub(r"[^a-z0-9]+", "-", nombre.lower()).strip("-") or "cliente"
+    reg = re.sub(r"-don$|-la$|-el$", "", reg) or "cliente"
+    f = f"{DIR_PLANOS}/{reg}.txt"
+    fecha = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    nota = re.sub(r"\s+", " ", txt)[:220]
+    with open(f, "a") as fh:
+        fh.write(f"[{fecha}] {nombre} | {rubro} | sin ciudad | {wap} | {nota}\n")
+    return (f"✅ <b>Cliente guardado</b>\n"
+            f"🏪 {html.escape(nombre)}\n"
+            f"🧾 {html.escape(rubro)}\n"
+            f"📱 {wap}\n"
+            f"📂 <code>/var/lib/marketattack/prospectos/{reg}.txt</code>\n\n"
+            f"¿Le creo la tienda ya? Escríbele así:\n"
+            f"<code>/cliente {html.escape(nombre)} | {html.escape(rubro)} | ciudad | {wap}</code>\n"
+            f"y luego los productos. También pídeme la <code>/oferta</code> para mandarle.")
+
+
 def procesar(txt):
     if txt.startswith("/"):
         c, _, arg = txt.partition(" ")
@@ -394,7 +493,18 @@ def procesar(txt):
         if c in ("/start", "/ayuda", "ayuda", "?"):
             return AYUDA
         if c == "/cliente":
-            return cmd_cliente(txt) if arg.strip() else FORMATO
+            if not arg.strip():
+                return FORMATO
+            if "|" in arg:
+                p = [x.strip() for x in arg.split("|")]
+                while len(p) < 5:
+                    p.append("")
+                cuerpo = ("Nombre: " + p[0] + "\nWhatsApp: " + p[3] + "\n"
+                          "Zona: " + (p[2] or "sin definir") + "\n")
+                if p[1]:
+                    cuerpo += "Tagline: " + p[1] + "\n"
+                return cmd_cliente("/cliente\n" + cuerpo)
+            return cmd_cliente(txt)
         if c == "/estado":
             return cmd_estado()
         if c == "/comandos":
@@ -438,6 +548,9 @@ def procesar(txt):
             open(SESS_FILE, "w").write(sid)
             return "✅ Conversación nueva."
         return f"No conozco ese comando.\n\n{AYUDA}"
+    auto = intento_prospecto(txt)
+    if auto:
+        return auto
     tg("sendChatAction", chat_id=CHAT, action="typing")
     r = oc("POST", f"/session/{sesion()}/message",
            {"parts": [{"type": "text", "text": txt}]}, timeout=1800)
