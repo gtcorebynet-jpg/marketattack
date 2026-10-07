@@ -45,17 +45,35 @@ sudo cp /tmp/pub/ESTADO.txt "$REPO/ESTADO.txt" 2>/dev/null
 sudo cp /tmp/pub/SHA256SUMS "$REPO/SHA256SUMS" 2>/dev/null
 sudo chown -R gituser:gituser "$REPO" 2>/dev/null || true
 
-sudo -u gituser bash -c "
+export GIT_SSH_COMMAND="ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+
+if sudo git ls-remote "$REMOTO" >/dev/null 2>&1; then
+  if [ ! -d "$REPO/.git" ]; then
+    echo "  · clonando el repo desde GitHub"
+    sudo rm -rf "$REPO"
+    sudo git clone -q --branch main "$REMOTO" "$REPO" 2>/dev/null || sudo git clone -q "$REMOTO" "$REPO"
+  fi
+else
+  [ -d "$REPO/.git" ] || sudo git init -q -b main "$REPO"
+fi
+
+sudo bash -c "
+  export GIT_SSH_COMMAND='ssh -i /root/.ssh/id_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
   cd '$REPO' || exit 1
-  [ -d .git ] || git init -q
   git config user.email 'vps@marketattack.local'
   git config user.name 'MARKETATTACK VPS'
   git config core.safecrlf false
-  git remote add origin '$REMOTO' 2>/dev/null || git remote set-url origin '$REMOTO'
+  git remote set-url origin '$REMOTO'
+  git checkout -q -B main
   printf '*.db\n*.zip\n*.tar.gz\n*.key\n' > .gitignore
   git add -A 2>/dev/null
   if git diff --cached --quiet; then echo '  sin cambios nuevos'; exit 0; fi
-  git commit -q -m 'respaldo automático del VPS \$(date +%Y-%m-%d_%H:%M)'
-  git push -q origin HEAD:$(git branch --show-current 2>/dev/null || echo main) 2>&1 && echo '  ✓ empujado a GitHub' || echo '  ✗ no se pudo empujar'
+  git commit -q -m \"respaldo automático del VPS $(date '+%Y-%m-%d %H:%M')\"
+  if git push -q origin main; then
+    echo '  ✓ empujado a GitHub (rama main)'
+  else
+    echo '  ✗ no se pudo empujar'
+  fi
 " || echo "  ⚠ el espejo no se pudo actualizar"
+
 sudo rm -rf /tmp/pub
